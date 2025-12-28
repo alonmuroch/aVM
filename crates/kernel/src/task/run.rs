@@ -2,7 +2,7 @@ use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, TASKS};
 use crate::mmu;
 use program::logf;
 
-use super::{REG_A0, REG_A1, REG_A2, REG_A3, REG_RA, REG_SP, TRAMPOLINE_VA};
+use super::{REG_A0, REG_A1, REG_A2, REG_A3, REG_RA, REG_SP, TRAMPOLINE_VA, TRAP_TRAMPOLINE_VA};
 
 const SSTATUS_SPP: u32 = 1 << 8;
 
@@ -76,6 +76,7 @@ pub fn run_task(task_idx: usize) {
     unsafe {
         core::arch::asm!("csrw sstatus, {0}", in(reg) sstatus);
         core::arch::asm!("csrw sepc, {0}", in(reg) pc);
+        core::arch::asm!("csrw stvec, {0}", in(reg) TRAP_TRAMPOLINE_VA);
     }
     // Update the helper's view of the current root before switching.
     mmu::set_current_root(target_root);

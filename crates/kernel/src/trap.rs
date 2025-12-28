@@ -2,6 +2,7 @@ use core::arch::asm;
 use program::{log, logf};
 
 use crate::syscall;
+use crate::task::TRAMPOLINE_VA;
 
 const SCAUSE_ECALL_FROM_U: usize = 8;
 const SCAUSE_ECALL_FROM_S: usize = 9;
@@ -21,58 +22,90 @@ pub fn init_trap_vector(kstack_top: u32) {
 
 /// Trap entry stub:
 /// - Switch to the kernel stack via sscratch.
-/// - Save sepc, ra, a0-a7, and t0.
+/// - Save sepc, ra, a0-a7, and t0 (user satp).
 /// - Call into the Rust trap handler with a pointer to the saved area.
-/// - Restore registers and return with sret.
+/// - Restore registers and return via the shared trampoline.
 // #[unsafe(naked)]
 pub unsafe extern "C" fn trap_entry() -> ! {
     unsafe {
-        asm!(
-            // Switch to kernel stack and make room for saved registers.
-            "csrrw sp, sscratch, sp",
-            "addi sp, sp, -44",
-            // Save caller-saved registers we clobber and sepc.
-            "sw t0, 40(sp)",
-            "csrr t0, sepc",
-            "sw t0, 0(sp)",   // saved sepc
-            "sw ra, 4(sp)",
-            "sw a0, 8(sp)",
-            "sw a1, 12(sp)",
-            "sw a2, 16(sp)",
-            "sw a3, 20(sp)",
-            "sw a4, 24(sp)",
-            "sw a5, 28(sp)",
-            "sw a6, 32(sp)",
-            "sw a7, 36(sp)",
-            // Call Rust trap handler with pointer to the save area in a0.
-            "mv a0, sp",
-            "call {handler}",
-            // Restore sepc and registers, then return from trap.
-            "lw t0, 0(sp)",
-            "csrw sepc, t0",
-            "lw ra, 4(sp)",
-            "lw a0, 8(sp)",
-            "lw a1, 12(sp)",
-            "lw a2, 16(sp)",
-            "lw a3, 20(sp)",
-            "lw a4, 24(sp)",
-            "lw a5, 28(sp)",
-            "lw a6, 32(sp)",
-            "lw a7, 36(sp)",
-            "lw t0, 40(sp)",
-            "addi sp, sp, 44",
-            "csrrw sp, sscratch, sp",
-            "sret",
-            handler = sym handle_trap
+        core::arch::asm!(
+            "call {save} # save regs on kernel stack",
+            "call {handler} # run Rust trap handler",
+            "j {restore} # restore regs and return",
+            save = sym save_trap_frame,
+            handler = sym handle_trap,
+            restore = sym restore_trap_frame,
+            options(noreturn),
         );
-        core::hint::unreachable_unchecked();
     }
+}
+
+#[unsafe(naked)]
+unsafe extern "C" fn save_trap_frame() -> ! {
+    core::arch::naked_asm!(
+        // Switch to kernel stack and make room for saved registers.
+        "csrrw sp, sscratch, sp",
+        "addi sp, sp, -44",
+        // Save caller-saved registers we clobber and sepc.
+        "sw t0, 40(sp)", // t0 holds user satp from trap trampoline
+        "csrr t0, sepc",
+        "sw t0, 0(sp)", // saved sepc
+        "sw ra, 4(sp)",
+        "sw a0, 8(sp)",
+        "sw a1, 12(sp)",
+        "sw a2, 16(sp)",
+        "sw a3, 20(sp)",
+        "sw a4, 24(sp)",
+        "sw a5, 28(sp)",
+        "sw a6, 32(sp)",
+        "sw a7, 36(sp)",
+        "mv a0, sp", // return saved-area pointer in a0
+        "ret",
+    );
+}
+
+#[unsafe(naked)]
+unsafe extern "C" fn restore_trap_frame() -> ! {
+    core::arch::naked_asm!(
+        // Restore sepc and registers.
+        "lw t1, 0(sp)",
+        "csrw sepc, t1",
+        "lw ra, 4(sp)",
+        "lw a0, 8(sp)",
+        "lw a1, 12(sp)",
+        "lw a2, 16(sp)",
+        "lw a3, 20(sp)",
+        "lw a4, 24(sp)",
+        "lw a5, 28(sp)",
+        "lw a6, 32(sp)",
+        "lw a7, 36(sp)",
+        "lw t0, 40(sp)", // user satp from trap trampoline
+        "addi sp, sp, 44",
+        "csrrw sp, sscratch, sp",
+        "j {return}",
+        return = sym return_from_trap,
+    );
+}
+
+#[unsafe(naked)]
+unsafe extern "C" fn return_from_trap() -> ! {
+    core::arch::naked_asm!(
+        "csrr t1, sstatus",
+        "andi t1, t1, {spp}",
+        "bnez t1, 1f",
+        "li t1, {tramp}",
+        "jr t1",
+        "1:",
+        "sret",
+        tramp = const TRAMPOLINE_VA,
+        spp = const SSTATUS_SPP,
+    );
 }
 
 /// Rust-level trap handler. Receives a pointer to the saved register block
 /// laid out as:
 /// [0] sepc, [1] ra, [2] a0, [3] a1, [4] a2, [5] a3, [6] a4, [7] a5,
-/// [8] a6, [9] a7, [10] t0.
+/// [8] a6, [9] a7, [10] t0 (user satp from trap trampoline).
 #[unsafe(no_mangle)]
 pub extern "C" fn handle_trap(saved: *mut u32) {
     let regs = unsafe { core::slice::from_raw_parts_mut(saved, SAVED_REG_COUNT) };
