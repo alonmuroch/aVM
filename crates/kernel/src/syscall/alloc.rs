@@ -1,6 +1,6 @@
 use program::{log, logf};
 
-use crate::global::{CURRENT_TASK, TASKS};
+use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, TASKS};
 pub(crate) fn sys_alloc(args: [u32; 6]) -> u32 {
     let size = args[0];
     let align = args[1];
@@ -15,6 +15,11 @@ pub(crate) fn sys_alloc(args: [u32; 6]) -> u32 {
     }
 
     let current = unsafe { *CURRENT_TASK.get_mut() };
+    // Kernel task should never call sys_alloc.
+    if current == KERNEL_TASK_SLOT {
+        panic!("sys_alloc: kernel task cannot allocate memory");
+    }
+
     let tasks = unsafe { TASKS.get_mut() };
     let task = match tasks.get_mut(current) {
         Some(task) => task,
@@ -57,6 +62,11 @@ pub(crate) fn sys_alloc(args: [u32; 6]) -> u32 {
 }
 
 pub(crate) fn sys_dealloc(_args: [u32; 6]) -> u32 {
+    let current = unsafe { *CURRENT_TASK.get_mut() };
+    // Kernel task should never call sys_alloc.
+    if current == KERNEL_TASK_SLOT {
+        panic!("sys_alloc: kernel task cannot allocate memory");
+    }
     // No-op: kernel heap is bump-only for now.
     0
 }
