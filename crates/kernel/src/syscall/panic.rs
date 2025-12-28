@@ -2,7 +2,7 @@ use program::{log, logf};
 use types::{SV32_DIRECT_MAP_BASE, SV32_PAGE_SIZE};
 
 use crate::global::{CURRENT_TASK, TASKS};
-use crate::mmu;
+use crate::memory::page_allocator as mmu;
 
 pub(crate) fn sys_panic_with_message(msg_ptr: u32, msg_len: u32) -> u32 {
     if msg_ptr == 0 || msg_len == 0 {

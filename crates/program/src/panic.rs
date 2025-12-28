@@ -23,8 +23,8 @@ pub fn vm_panic(msg: &[u8]) -> ! {
     }
 }
 
-/// Guest panic handler for RISC-V builds (only when guest_handlers enabled).
-#[cfg(all(target_arch = "riscv32", feature = "guest_handlers"))]
+/// Guest panic handler for RISC-V builds (only when guest feature enabled).
+#[cfg(all(target_arch = "riscv32", feature = "guest"))]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     use core::fmt::Write;

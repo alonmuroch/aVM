@@ -1,4 +1,5 @@
-use crate::{AddressSpace, Config, Task, mmu};
+use crate::{AddressSpace, Config, Task};
+use crate::memory::page_allocator as mmu;
 use program::{log, logf};
 use types::address::Address;
 

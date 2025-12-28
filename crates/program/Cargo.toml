@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["guest_handlers"]
-guest_handlers = []
+guest = []
 
 [dependencies]
 types = { path = "../types" }

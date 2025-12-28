@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-program = { path = "../program" }
+program = { path = "../program", features = ["guest"] }
 sha2 = { version = "0.10", default-features = false }
 k256 = { version = "0.13", default-features = false, features = ["arithmetic", "ecdsa", "alloc"] }
 

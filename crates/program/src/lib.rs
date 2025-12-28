@@ -54,14 +54,14 @@ pub use storage::PERSISTENT_DOMAIN; // Allow `$crate::PERSISTENT_DOMAIN` in macr
 pub mod router;
 pub use router::{decode_calls, route, FuncCall};
 
-// Panic helper (and panic handler when guest_handlers enabled)
+// Panic helper (and panic handler when guest feature enabled)
 pub mod panic;
 pub use panic::vm_panic;
 
 // Memory allocator
 pub mod allocator;
 
-#[cfg(all(target_arch = "riscv32", feature = "guest_handlers"))]
+#[cfg(all(target_arch = "riscv32", feature = "guest"))]
 #[global_allocator]
 static ALLOCATOR: allocator::VmAllocator = allocator::VmAllocator;
 

@@ -4,7 +4,8 @@ use core::ptr;
 use state::State;
 
 use crate::Task;
-use crate::mmu::PageAllocator;
+use crate::memory::heap::BumpAllocator;
+use crate::memory::page_allocator::PageAllocator;
 
 /// Minimal wrapper to store non-`Sync` types in statics.
 ///
@@ -124,7 +125,7 @@ impl Drop for TaskList {
 #[allow(dead_code)]
 pub static TASKS: Global<TaskList> = Global::new(TaskList::new());
 pub static STATE: Global<Option<State>> = Global::new(None);
-pub static PAGE_ALLOC_INIT: Global<bool> = Global::new(false);
 pub static NEXT_ASID: Global<u16> = Global::new(1);
 pub static ROOT_PPN: Global<u32> = Global::new(0);
 pub static PAGE_ALLOC: Global<Option<PageAllocator>> = Global::new(None);
+pub static KERNEL_HEAP: Global<BumpAllocator> = Global::new(BumpAllocator::empty());

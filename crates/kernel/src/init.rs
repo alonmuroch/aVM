@@ -3,13 +3,18 @@ use core::{cmp, slice};
 use program::{log, logf};
 use state::State;
 
-use kernel::global::{CURRENT_TASK, KERNEL_TASK_SLOT, PAGE_ALLOC_INIT, STATE, TASKS};
-use kernel::{mmu, BootInfo, Task, trap};
+use kernel::global::{CURRENT_TASK, KERNEL_TASK_SLOT, STATE, TASKS};
+use kernel::{BootInfo, Task, trap};
+use kernel::memory::{heap, page_allocator};
 
 /// Initialize kernel state from the bootloader handoff and optional state blob.
 pub fn init_kernel(state_ptr: *const u8, state_len: usize, boot_info_ptr: *const BootInfo) {
     let boot_info = unsafe { boot_info_ptr.as_ref() };
     if let Some(info) = init_boot_info(boot_info) {
+        unsafe {
+            page_allocator::init(info);
+            heap::init(info.heap_ptr, info.va_base, info.va_len);
+        }
         trap::init_trap_vector(info.kstack_top);
         init_state(state_ptr, state_len);
     } else {
@@ -44,12 +49,6 @@ fn init_boot_info(boot_info: Option<&BootInfo>) -> Option<&BootInfo> {
             .unwrap_or(0)
     );
     if let Some(info) = boot_info {
-        unsafe {
-            if !*PAGE_ALLOC_INIT.get_mut() {
-                mmu::init(info);
-                *PAGE_ALLOC_INIT.get_mut() = true;
-            }
-        }
         let task = Task::kernel(
             info.root_ppn,
             info.heap_ptr,
