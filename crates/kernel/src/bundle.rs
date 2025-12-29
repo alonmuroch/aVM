@@ -30,6 +30,6 @@ fn execute_transaction(tx: &Transaction) {
     match tx.tx_type {
         TransactionType::CreateAccount => create_account(tx),
         TransactionType::ProgramCall => program_call(tx),
-        _ => log!("executing transaction"),
+        _ => panic!("unsupported transaction type"),
     }
 }
