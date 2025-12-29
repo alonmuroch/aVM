@@ -1,6 +1,6 @@
 use alloc::format;
 
-use kernel::{prep_program_task, run_task, Config, PROGRAM_WINDOW_BYTES};
+use kernel::{kernel_run_task, prep_program_task, Config, PROGRAM_WINDOW_BYTES};
 use kernel::global::{STATE, TASKS};
 use program::{log, logf};
 use program::parser::HexCodec;
@@ -89,7 +89,7 @@ pub(crate) fn program_call(tx: &Transaction) {
                 return;
             }
             let current = tasks_slot.len().saturating_sub(1);
-            run_task(current);
+            kernel_run_task(current);
         }
     } else {
         log!("Program call skipped: no memory manager installed");

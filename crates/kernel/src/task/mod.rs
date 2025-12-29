@@ -31,8 +31,11 @@
 //       a0..a3 = to/from/input_base/input_len
 //    Caller can push the task into TASKS for bookkeeping.
 //
+// kernel_run_task(task):
+// - Save the current kernel register file (x0-x31 + pc) into TASKS[0].
+// - Run the task (same behavior as run_task).
+//
 // run_task(task):
-// - Save the current kernel frame (sp/ra/pc) into TASKS[0] for a future return path.
 // - Preload t0 with the task root (satp value); load user sp and a0..a3; clear ra.
 // - Set sepc to the user PC and clear sstatus.SPP so sret enters user mode.
 // - Set stvec to the trap trampoline VA.
@@ -55,7 +58,7 @@ pub mod run;
 
 pub use task::{AddressSpace, Task, TrapFrame};
 pub use prep::prep_program_task;
-pub use run::run_task;
+pub use run::{kernel_run_task, run_task};
 
 const PAGE_SIZE: usize = 4096;
 const STACK_BYTES: usize = 0x4000; // 16 KiB user stack
