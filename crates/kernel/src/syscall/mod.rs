@@ -5,9 +5,11 @@ use program::{log, logf};
 
 pub mod alloc;
 pub mod panic;
+pub mod storage;
 
 use alloc::{sys_alloc, sys_dealloc};
 use panic::sys_panic;
+use storage::{sys_storage_get, sys_storage_set};
 pub(crate) use panic::sys_panic_with_message;
 
 pub const SYSCALL_STORAGE_GET: u32 = 1;
@@ -46,16 +48,6 @@ pub fn dispatch_syscall(call_id: u32, args: [u32; 6], caller_mode: CallerMode) -
             0
         }
     }
-}
-
-fn sys_storage_get(_args: [u32; 6]) -> u32 {
-    log!("sys_storage_get: need implementation");
-    0
-}
-
-fn sys_storage_set(_args: [u32; 6]) -> u32 {
-    log!("sys_storage_set: need implementation");
-    0
 }
 
 fn sys_log(_args: [u32; 6], caller_mode: CallerMode) -> u32 {
