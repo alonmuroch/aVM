@@ -9,8 +9,6 @@ use program::{log, logf};
 
 mod init;
 mod bundle;
-mod create_account;
-mod program_call;
 use crate::bundle::process_bundle;
 use crate::init::init_kernel;
 

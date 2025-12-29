@@ -3,8 +3,11 @@ use core::mem::forget;
 use program::{log, logf};
 use types::transaction::{Transaction, TransactionBundle, TransactionType};
 
-use crate::create_account::create_account;
-use crate::program_call::program_call;
+mod create_account;
+mod program_call;
+
+use self::create_account::create_account;
+use self::program_call::program_call;
 
 pub(crate) fn process_bundle(encoded_bundle: &[u8]) {
     log!("processing transaction bundle");
