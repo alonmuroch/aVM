@@ -6,9 +6,10 @@ use core::cmp;
 use program::{log, logf};
 use types::{Address, ADDRESS_LEN, SV32_DIRECT_MAP_BASE, SV32_PAGE_SIZE};
 
-use crate::global::{CURRENT_TASK, STATE, TASKS};
+use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, STATE, TASKS};
 use crate::memory::page_allocator as mmu;
 use crate::syscall::alloc::sys_alloc;
+use crate::task::TO_PTR_ADDR;
 use state::State;
 
 pub(crate) fn sys_storage_get(args: [u32; 6]) -> u32 {
@@ -35,6 +36,10 @@ pub(crate) fn sys_storage_get(args: [u32; 6]) -> u32 {
     }
     addr_buf.copy_from_slice(&address_bytes);
     let address = Address(addr_buf);
+    if !caller_address_matches(root_ppn, &address) {
+        log!("sys_storage_get: address mismatch with caller");
+        return 0;
+    }
 
     let domain_bytes = match read_user_bytes(root_ppn, domain_ptr, domain_len) {
         Some(bytes) => bytes,
@@ -122,6 +127,10 @@ pub(crate) fn sys_storage_set(args: [u32; 6]) -> u32 {
     let mut addr_buf = [0u8; ADDRESS_LEN];
     addr_buf.copy_from_slice(&address_bytes);
     let address = Address(addr_buf);
+    if !caller_address_matches(root_ppn, &address) {
+        log!("sys_storage_set: address mismatch with caller");
+        return 0;
+    }
 
     let domain_bytes = match read_user_bytes(root_ppn, domain_ptr, domain_len) {
         Some(bytes) => bytes,
@@ -198,6 +207,23 @@ pub(crate) fn read_user_bytes(root_ppn: u32, ptr: u32, len: usize) -> Option<Vec
         va = va.wrapping_add(to_copy as u32);
     }
     Some(buf)
+}
+
+fn caller_address_matches(root_ppn: u32, address: &Address) -> bool {
+    let current = unsafe { *CURRENT_TASK.get_mut() };
+    if current == KERNEL_TASK_SLOT {
+        return true;
+    }
+    let caller_bytes = match read_user_bytes(root_ppn, TO_PTR_ADDR, ADDRESS_LEN) {
+        Some(bytes) => bytes,
+        None => return false,
+    };
+    if caller_bytes.len() != ADDRESS_LEN {
+        return false;
+    }
+    let mut caller_buf = [0u8; ADDRESS_LEN];
+    caller_buf.copy_from_slice(&caller_bytes);
+    Address(caller_buf) == *address
 }
 
 fn hex_encode(bytes: &[u8]) -> String {

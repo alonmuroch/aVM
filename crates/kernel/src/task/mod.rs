@@ -99,7 +99,7 @@ const TRAMPOLINE_CODE: [u32; 2] = [
     0x1020_0073, // sret
 ];
 
-const TO_PTR_ADDR: u32 = 0x120;
+pub(crate) const TO_PTR_ADDR: u32 = 0x120;
 const FROM_PTR_ADDR: u32 = TO_PTR_ADDR + ADDRESS_LEN as u32;
 const INPUT_BASE_ADDR: u32 = Config::HEAP_START_ADDR as u32;
 
