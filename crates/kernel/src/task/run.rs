@@ -9,6 +9,7 @@ const REG_COUNT: usize = 32;
 const REG_PC: usize = 32;
 const TRAP_FRAME_WORDS: usize = REG_COUNT + 1; // regs + pc
 const TRAP_FRAME_BYTES: i32 = (TRAP_FRAME_WORDS * 4) as i32;
+const REG_RA: usize = 1;
 
 /// One-way context switch into a user task:
 /// - Loads the task's satp/regs/pc and jumps to user code (no return path yet)
@@ -45,6 +46,20 @@ pub fn run_task(task_idx: usize) {
         pc,
         sp,
     );
+    unsafe {
+        if let Some(task) = TASKS.get_mut().get(task_idx) {
+            if let Some(caller_idx) = task.caller_task_id {
+                if let Some(caller_task) = TASKS.get_mut().get(caller_idx) {
+                    logf!(
+                        "run_task: return ra=0x%x sp=0x%x for caller %d",
+                        caller_task.tf.regs[REG_RA],
+                        caller_task.tf.regs[REG_SP],
+                        caller_idx as u32
+                    );
+                }
+            }
+        }
+    }
     // Prepare to enter user mode via sret: set sepc and clear sstatus.SPP.
     let mut sstatus: u32;
     unsafe {

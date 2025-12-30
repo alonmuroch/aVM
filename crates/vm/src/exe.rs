@@ -1,4 +1,4 @@
-use super::{Instruction, MemoryAccessKind, Memory, CPU, CSR_SATP, CSR_SEPC, SCAUSE_ECALL_FROM_U};
+use super::{Instruction, MemoryAccessKind, Memory, CPU, CSR_SATP, CSR_SEPC, SCAUSE_BREAKPOINT};
 use crate::sys_call::SYSCALL_LOG;
 use crate::memory::VirtualAddress;
 use crate::host_interface::HostInterface;
@@ -877,6 +877,12 @@ impl CPU {
             Instruction::Ebreak => {
                 // EDUCATIONAL: EBREAK - Environment Break - for debugging
                 // In real systems, this would trigger a debugger breakpoint
+                if self.priv_mode == super::PrivilegeMode::User && self.has_trap_vector() {
+                    if !self.trap_to_vector(SCAUSE_BREAKPOINT, 0, None) {
+                        panic!("trap_to_vector returned false for ebreak pc=0x{:08x}", self.pc);
+                    }
+                    return true;
+                }
                 return false;
             }
             Instruction::Mret => {

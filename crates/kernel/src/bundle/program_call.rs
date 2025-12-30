@@ -89,7 +89,13 @@ pub(crate) fn program_call(tx: &Transaction) {
                 return;
             }
             let current = tasks_slot.len().saturating_sub(1);
-            kernel_run_task(current);
+            core::arch::asm!(
+                "la ra, 1f",
+                "j {run}",
+                "1:",
+                run = sym kernel_run_task,
+                in("a0") current,
+            );
         }
     } else {
         log!("Program call skipped: no memory manager installed");

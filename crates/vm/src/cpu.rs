@@ -19,6 +19,7 @@ pub const CSR_SCAUSE: u16 = 0x142;
 pub const CSR_STVAL: u16 = 0x143;
 const SCAUSE_ECALL_FROM_U: u32 = 8;
 const SCAUSE_ECALL_FROM_S: u32 = 9;
+const SCAUSE_BREAKPOINT: u32 = 3;
 const SSTATUS_SPP: u32 = 1 << 8;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

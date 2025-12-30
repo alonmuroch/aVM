@@ -53,6 +53,8 @@ pub struct Task {
     pub addr_space: AddressSpace,
     /// Next heap pointer for this task (virtual address).
     pub heap_ptr: u32,
+    /// Task slot that initiated this task, if any.
+    pub caller_task_id: Option<usize>,
 }
 
 impl Task {
@@ -61,6 +63,7 @@ impl Task {
             tf: TrapFrame::default(),
             addr_space,
             heap_ptr,
+            caller_task_id: None,
         }
     }
 

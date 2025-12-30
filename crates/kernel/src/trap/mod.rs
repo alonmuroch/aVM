@@ -1,6 +1,8 @@
 use core::arch::asm;
 use program::{log, logf};
 
+use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, TASKS};
+use crate::memory::page_allocator as mmu;
 use crate::syscall;
 use crate::task::TRAMPOLINE_VA;
 
@@ -12,10 +14,12 @@ use save_trap_frame::save_trap_frame;
 
 const SCAUSE_ECALL_FROM_U: usize = 8;
 const SCAUSE_ECALL_FROM_S: usize = 9;
+const SCAUSE_BREAKPOINT: usize = 3;
 const SSTATUS_SPP: u32 = 1 << 8;
 const REG_COUNT: usize = 32;
 const TRAP_FRAME_WORDS: usize = REG_COUNT + 1; // regs + pc
 const TRAP_FRAME_BYTES: i32 = (TRAP_FRAME_WORDS * 4) as i32;
+const REG_RA: usize = 1;
 const REG_A0: usize = 10;
 const REG_A1: usize = 11;
 const REG_A2: usize = 12;
@@ -24,6 +28,7 @@ const REG_A4: usize = 14;
 const REG_A5: usize = 15;
 const REG_A6: usize = 16;
 const REG_A7: usize = 17;
+const REG_SP: usize = 2;
 const REG_PC: usize = 32;
 
 /// Install the kernel trap vector and set up the kernel stack for traps.
@@ -48,8 +53,11 @@ pub unsafe extern "C" fn trap_entry() -> ! {
         core::arch::asm!(
             "call {swap} # switch to kernel stack and reserve trap frame",
             "call {save} # save regs on kernel stack",
+            "mv s0, a0 # preserve trap frame pointer across handle_trap",
             "call {handler} # run Rust trap handler",
-            "j {restore} # restore regs and return",
+            "mv a2, a1 # stash return kind",
+            "mv a1, s0 # restore trap frame pointer for restore",
+            "j {restore}",
             swap = sym swap_to_kernel_stack,
             save = sym save_trap_frame,
             handler = sym handle_trap,
@@ -62,7 +70,12 @@ pub unsafe extern "C" fn trap_entry() -> ! {
 #[unsafe(naked)]
 unsafe extern "C" fn swap_to_kernel_stack() -> ! {
     core::arch::naked_asm!(
+        // Swap sp with sscratch:
+        // - On trap entry, sscratch holds the kernel stack top.
+        // - After the swap, sp points at the kernel stack and the previous sp
+        //   (user sp) is saved in sscratch for later restoration.
         "csrrw sp, sscratch, sp",
+        // Reserve space for the trap frame on the kernel stack.
         "addi sp, sp, -{frame_bytes}",
         "ret",
         frame_bytes = const TRAP_FRAME_BYTES,
@@ -88,7 +101,7 @@ unsafe extern "C" fn return_from_trap() -> ! {
 /// laid out as:
 /// regs[0..32] = x0..x31, regs[32] = pc.
 #[unsafe(no_mangle)]
-pub extern "C" fn handle_trap(saved: *mut u32) {
+pub extern "C" fn handle_trap(saved: *mut u32) -> (u32, u32) {
     let regs = unsafe { core::slice::from_raw_parts_mut(saved, TRAP_FRAME_WORDS) };
     let scause = read_scause();
     let stval = read_stval();
@@ -103,6 +116,8 @@ pub extern "C" fn handle_trap(saved: *mut u32) {
     }
 
     let code = scause & 0xfff;
+    let mut return_kind = if read_sstatus() & SSTATUS_SPP != 0 { 1 } else { 0 };
+    let mut return_sp = regs[REG_SP];
     match code {
         SCAUSE_ECALL_FROM_U | SCAUSE_ECALL_FROM_S => {
             let args = [
@@ -122,9 +137,64 @@ pub extern "C" fn handle_trap(saved: *mut u32) {
             let ret = syscall::dispatch_syscall(call_id, args, caller_mode);
             regs[REG_A0] = ret; // a0 return value
             regs[REG_PC] = regs[REG_PC].wrapping_add(4); // Advance past ecall
+            return_kind = 0;
+            return_sp = regs[REG_SP];
+        }
+        SCAUSE_BREAKPOINT => {
+            // Default to returning to the kernel task unless the current task has a caller.
+            let mut caller_idx = KERNEL_TASK_SLOT;
+            unsafe {
+                let current = *CURRENT_TASK.get_mut();
+                let tasks = TASKS.get_mut();
+                // If this is a user task, save its current trapframe so it can be resumed later.
+                if current != KERNEL_TASK_SLOT {
+                    if let Some(task) = tasks.get_mut(current) {
+                        for (idx, value) in regs.iter().take(REG_COUNT).enumerate() {
+                            task.tf.regs[idx] = *value;
+                        }
+                        task.tf.pc = regs[REG_PC];
+                        // Use the recorded caller task as the return target.
+                        caller_idx = task.caller_task_id.unwrap_or(KERNEL_TASK_SLOT);
+                    }
+                }
+                // Restore the caller task's trapframe and address-space root.
+                if let Some(caller_task) = tasks.get(caller_idx) {
+                    for (idx, value) in caller_task.tf.regs.iter().take(REG_COUNT).enumerate() {
+                        regs[idx] = *value;
+                    }
+                    // Resume at the caller's return address.
+                    regs[REG_PC] = caller_task.tf.regs[REG_RA];
+                    mmu::set_current_root(caller_task.addr_space.root_ppn);
+                    return_sp = caller_task.tf.regs[REG_SP];
+                    logf!(
+                        "breakpoint return: caller=%d pc=0x%x ra=0x%x sp=0x%x",
+                        caller_idx as u32,
+                        caller_task.tf.pc,
+                        caller_task.tf.regs[REG_RA],
+                        caller_task.tf.regs[REG_SP]
+                    );
+                } else {
+                    panic!("breakpoint trap: caller task missing");
+                }
+                // Mark the caller as the current task after the handoff.
+                *CURRENT_TASK.get_mut() = caller_idx;
+            }
+            let mut sstatus = read_sstatus();
+            // Set SPP so sret returns to the correct privilege level.
+            if caller_idx == KERNEL_TASK_SLOT {
+                // Return to supervisor when the caller is the kernel task.
+                sstatus |= SSTATUS_SPP;
+                return_kind = 1;
+            } else {
+                // Clear SPP to return to user mode for user callers.
+                sstatus &= !SSTATUS_SPP;
+                return_kind = 0;
+            }
+            unsafe { asm!("csrw sstatus, {0}", in(reg) sstatus); }
         }
         _ => log!("unhandled trap"),
     }
+    (return_sp, return_kind)
 }
 
 #[inline(always)]

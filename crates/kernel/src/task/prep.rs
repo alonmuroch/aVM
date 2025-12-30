@@ -1,4 +1,5 @@
 use crate::{AddressSpace, Config, Task};
+use crate::global::CURRENT_TASK;
 use crate::memory::page_allocator as mmu;
 use program::{log, logf};
 use types::address::Address;
@@ -187,6 +188,8 @@ pub fn prep_program_task(
         ),
         Config::HEAP_START_ADDR as u32,
     );
+    let caller = unsafe { *CURRENT_TASK.get_mut() };
+    task.caller_task_id = Some(caller);
     // Set up initial trapframe.
     let stack_top = PROGRAM_VA_BASE
         .wrapping_add((Config::CODE_SIZE_LIMIT + Config::RO_DATA_SIZE_LIMIT + STACK_BYTES) as u32);
