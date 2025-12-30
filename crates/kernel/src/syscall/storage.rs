@@ -155,7 +155,7 @@ pub(crate) fn sys_storage_set(args: [u32; 6]) -> u32 {
     0
 }
 
-fn current_root_ppn() -> Option<u32> {
+pub(crate) fn current_root_ppn() -> Option<u32> {
     let current = unsafe { *CURRENT_TASK.get_mut() };
     let tasks = unsafe { TASKS.get_mut() };
     match tasks.get(current) {
@@ -167,7 +167,7 @@ fn current_root_ppn() -> Option<u32> {
     }
 }
 
-fn read_user_bytes(root_ppn: u32, ptr: u32, len: usize) -> Option<Vec<u8>> {
+pub(crate) fn read_user_bytes(root_ppn: u32, ptr: u32, len: usize) -> Option<Vec<u8>> {
     if len == 0 {
         return Some(Vec::new());
     }

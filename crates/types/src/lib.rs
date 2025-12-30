@@ -18,6 +18,9 @@ pub use primitives::*;
 pub mod transaction;
 pub use transaction::*;
 
+pub mod receipt;
+pub use receipt::TransactionReceipt;
+
 pub mod boot;
 pub use boot::BootInfo;
 

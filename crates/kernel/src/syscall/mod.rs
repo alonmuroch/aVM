@@ -4,10 +4,12 @@
 use program::{log, logf};
 
 pub mod alloc;
+pub mod fire_event;
 pub mod panic;
 pub mod storage;
 
 use alloc::{sys_alloc, sys_dealloc};
+use fire_event::sys_fire_event;
 use panic::sys_panic;
 use storage::{sys_storage_get, sys_storage_set};
 pub(crate) use panic::sys_panic_with_message;
@@ -64,10 +66,6 @@ fn sys_call_program(_args: [u32; 6]) -> u32 {
     0
 }
 
-fn sys_fire_event(_args: [u32; 6]) -> u32 {
-    log!("sys_fire_event: need implementation");
-    0
-}
 
 fn sys_transfer(_args: [u32; 6]) -> u32 {
     log!("sys_transfer: need implementation");

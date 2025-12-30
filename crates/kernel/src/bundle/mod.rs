@@ -1,9 +1,13 @@
 use core::mem::forget;
 
+extern crate alloc;
+
+use alloc::vec::Vec;
 use program::{log, logf};
 use types::transaction::{Transaction, TransactionBundle, TransactionType};
+use types::{Result, TransactionReceipt};
 
-use kernel::global::Global;
+use kernel::global::{BUNDLE, CURRENT_TX, RECEIPTS};
 
 mod create_account;
 mod program_call;
@@ -11,17 +15,21 @@ mod program_call;
 use self::create_account::create_account;
 use self::program_call::program_call;
 
-static BUNDLE: Global<Option<TransactionBundle>> = Global::new(None);
-static CURRNET_BUNDLE_TX: Global<usize> = Global::new(0);
-
 pub(crate) fn decode_bundle(encoded_bundle: &[u8]) -> bool {
     log!("processing transaction bundle");
     if let Some(bundle) = TransactionBundle::decode(encoded_bundle) {
         let count = bundle.transactions.len();
         logf!("decoded tx count=%d", count as u32);
+        let receipts = bundle
+            .transactions
+            .iter()
+            .cloned()
+            .map(|tx| TransactionReceipt::new(tx, Result::new(true, 0)))
+            .collect::<Vec<_>>();
         unsafe {
             *BUNDLE.get_mut() = Some(bundle);
-            *CURRNET_BUNDLE_TX.get_mut() = 0;
+            *CURRENT_TX.get_mut() = 0;
+            *RECEIPTS.get_mut() = Some(receipts);
         }
         true
     } else {
@@ -36,7 +44,7 @@ pub(crate) fn process_bundle() {
             .as_ref()
             .map(|bundle| bundle.transactions.len())
             .unwrap_or(0);
-        (*CURRNET_BUNDLE_TX.get_mut(), count)
+        (*CURRENT_TX.get_mut(), count)
     };
     if idx >= count {
         bundle_complete();
@@ -60,8 +68,8 @@ pub(crate) fn process_bundle() {
 
 pub(crate) extern "C" fn resume_bundle() -> ! {
     unsafe {
-        let curr = *CURRNET_BUNDLE_TX.get_mut();
-        *CURRNET_BUNDLE_TX.get_mut() = curr.wrapping_add(1);
+        let curr = *CURRENT_TX.get_mut();
+        *CURRENT_TX.get_mut() = curr.wrapping_add(1);
     }
     process_bundle();
     loop {}
@@ -87,6 +95,10 @@ fn bundle_complete() -> ! {
     let bundle = unsafe { BUNDLE.get_mut().take() };
     if let Some(bundle) = bundle {
         forget(bundle);
+    }
+    let receipts = unsafe { RECEIPTS.get_mut().take() };
+    if let Some(receipts) = receipts {
+        forget(receipts);
     }
     unsafe { core::arch::asm!("ebreak") };
     loop {}

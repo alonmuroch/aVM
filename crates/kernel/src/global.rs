@@ -1,7 +1,12 @@
+extern crate alloc;
+
+use alloc::vec::Vec;
 use core::cell::UnsafeCell;
 use core::mem::MaybeUninit;
 use core::ptr;
 use state::State;
+use types::TransactionReceipt;
+use types::transaction::TransactionBundle;
 
 use crate::Task;
 use crate::memory::heap::BumpAllocator;
@@ -33,6 +38,9 @@ unsafe impl<T> Sync for Global<T> {}
 pub const MAX_TASKS: usize = 16;
 pub const KERNEL_TASK_SLOT: usize = 0;
 pub static CURRENT_TASK: Global<usize> = Global::new(KERNEL_TASK_SLOT);
+pub static CURRENT_TX: Global<usize> = Global::new(0);
+pub static RECEIPTS: Global<Option<Vec<TransactionReceipt>>> = Global::new(None);
+pub static BUNDLE: Global<Option<TransactionBundle>> = Global::new(None);
 
 pub struct TaskList {
     len: usize,
