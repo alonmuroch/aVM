@@ -87,6 +87,7 @@ fn mint(program: &Address, caller: Address, val: u32) {
 }
 
 fn transfer(program: &Address, caller: Address, to: Address, amount: u32) {
+    logf!("erc20: transfer amount=%d", amount);
     let from_bal = match Balances::get(program, caller) {
         O::Some(bal) => bal,
         O::None => 0,

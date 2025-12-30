@@ -9,7 +9,7 @@ use program::{log, logf};
 
 mod init;
 mod bundle;
-use crate::bundle::process_bundle;
+use crate::bundle::{decode_bundle, process_bundle};
 use crate::init::init_kernel;
 
 #[allow(dead_code)]
@@ -32,7 +32,11 @@ pub extern "C" fn _start(
     init_kernel(state_ptr, state_len, boot_info_ptr);
 
     let encoded_bundle = unsafe { slice::from_raw_parts(bundle_ptr, bundle_len) };
-    process_bundle(encoded_bundle);
+    if decode_bundle(encoded_bundle) {
+        process_bundle();
+    } else {
+        log!("bundle decode failed");
+    }
 
     log!("finished bundle execution");
     halt();

@@ -8,7 +8,13 @@ pub use types::boot::BootInfo;
 pub mod global;
 pub mod task;
 pub use task::{AddressSpace, Task, TrapFrame};
-pub use task::{kernel_run_task, prep_program_task, run_task, PROGRAM_VA_BASE, PROGRAM_WINDOW_BYTES};
+pub use task::{
+    kernel_run_task,
+    prep_program_task,
+    run_task,
+    PROGRAM_VA_BASE,
+    PROGRAM_WINDOW_BYTES,
+};
 pub mod memory;
 pub mod trap;
 pub mod syscall;

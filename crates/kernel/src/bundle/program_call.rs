@@ -7,7 +7,7 @@ use program::parser::HexCodec;
 use state::State;
 use types::transaction::Transaction;
 
-pub(crate) fn program_call(tx: &Transaction) {
+pub(crate) fn program_call(tx: &Transaction, resume: extern "C" fn() -> !) {
     let state = unsafe { STATE.get_mut().get_or_insert_with(State::new) };
     let account = match state.get_account(&tx.to) {
         Some(acc) => acc,
@@ -90,11 +90,12 @@ pub(crate) fn program_call(tx: &Transaction) {
             }
             let current = tasks_slot.len().saturating_sub(1);
             core::arch::asm!(
-                "la ra, 1f",
+                "mv ra, {resume}",
                 "j {run}",
-                "1:",
                 run = sym kernel_run_task,
+                resume = in(reg) resume as usize,
                 in("a0") current,
+                options(noreturn),
             );
         }
     } else {
