@@ -149,7 +149,7 @@ impl TestRunner {
         writeln!(self.writer.borrow_mut()).unwrap();
 
         // Execute the whole bundle via the bootloader/kernel path.
-        bootloader.execute_bundle(
+        let receipts = bootloader.execute_bundle(
             self.kernel_bytes.as_ref().ok_or_else(|| {
                 "KERNEL_ELF not set or unreadable; bootloader path required".to_string()
             })?,
@@ -162,6 +162,69 @@ impl TestRunner {
                 None
             },
         );
+
+        let receipts = match receipts {
+            Some(receipts) => receipts,
+            None => {
+                return Err("Bootloader returned no receipts".to_string());
+            }
+        };
+
+        let receipt = receipts
+            .last()
+            .ok_or_else(|| "No receipts returned from kernel".to_string())?;
+        writeln!(self.writer.borrow_mut(), "\n=== Receipt ===").unwrap();
+        writeln!(self.writer.borrow_mut(), "{receipt}").unwrap();
+        let result = receipt.result;
+        if result.success != case.expected_success {
+            return Err(format!(
+                "Expected success={}, got {}",
+                case.expected_success, result.success
+            ));
+        }
+        let error_code = result.error_code;
+        if error_code != case.expected_error_code {
+            return Err(format!(
+                "Expected error_code={}, got {}",
+                case.expected_error_code, error_code
+            ));
+        }
+        match &case.expected_data {
+            Some(expected) => {
+                let expected_len = expected.len();
+                let data_len = result.data_len as usize;
+                let actual_len = data_len;
+                if actual_len != expected_len {
+                    return Err(format!(
+                        "Expected data_len={}, got {}",
+                        expected_len, actual_len
+                    ));
+                }
+                let actual = &result.data[..actual_len.min(result.data.len())];
+                if actual != expected.as_slice() {
+                    return Err(format!(
+                        "Expected data {:?}, got {:?}",
+                        expected, actual
+                    ));
+                }
+            }
+            None => {
+                let data_len = result.data_len;
+                if data_len != 0 {
+                    return Err(format!(
+                        "Expected empty data, got data_len={}",
+                        data_len
+                    ));
+                }
+            }
+        }
+
+        writeln!(
+            self.writer.borrow_mut(),
+            "✅ Test case '{}' passed",
+            case.name
+        )
+        .unwrap();
 
         // For now we treat successful bootloader execution as a passed test.
         Ok(())

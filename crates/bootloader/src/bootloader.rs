@@ -6,7 +6,7 @@ use std::vec::Vec;
 
 use compiler::elf::parse_elf_from_bytes;
 use goblin::elf::Elf;
-use types::{boot::BootInfo, transaction::TransactionBundle, SV32_DIRECT_MAP_BASE};
+use types::{boot::BootInfo, transaction::TransactionBundle, TransactionReceipt, SV32_DIRECT_MAP_BASE};
 
 use crate::DefaultSyscallHandler;
 use state::State;
@@ -140,7 +140,7 @@ impl Bootloader {
         state: Rc<RefCell<State>>,
         verbose: bool,
         verbose_writer: Option<Rc<RefCell<dyn FmtWrite>>>,
-    ) {
+    ) -> Option<Vec<TransactionReceipt>> {
         let (entry_point, memory) = self.load_kernel(kernel_elf);
         let host: Box<dyn vm::host_interface::HostInterface> = Box::new(NoopHost);
 
@@ -164,6 +164,7 @@ impl Bootloader {
         self.place_state(&mut vm, &encoded_state);
         self.place_boot_info(&mut vm);
         vm.raw_run();
+        crate::result::read_kernel_receipts(&memory)
     }
 
     fn place_bundle(&mut self, vm: &mut VM, bundle: &TransactionBundle) {
@@ -246,4 +247,5 @@ impl Bootloader {
         self.heap_ptr.set(end);
         start
     }
+
 }

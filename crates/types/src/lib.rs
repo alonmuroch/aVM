@@ -21,6 +21,9 @@ pub use transaction::*;
 pub mod receipt;
 pub use receipt::TransactionReceipt;
 
+pub mod kernel_result;
+pub use kernel_result::KernelResult;
+
 pub mod boot;
 pub use boot::BootInfo;
 

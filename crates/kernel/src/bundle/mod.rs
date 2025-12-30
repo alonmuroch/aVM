@@ -11,9 +11,11 @@ use kernel::global::{BUNDLE, CURRENT_TX, RECEIPTS};
 
 mod create_account;
 mod program_call;
+mod result;
 
 use self::create_account::create_account;
 use self::program_call::program_call;
+use self::result::{update_receipt_from_task, write_kernel_result};
 
 pub(crate) fn decode_bundle(encoded_bundle: &[u8]) -> bool {
     log!("processing transaction bundle");
@@ -67,6 +69,7 @@ pub(crate) fn process_bundle() {
 }
 
 pub(crate) extern "C" fn resume_bundle() -> ! {
+    update_receipt_from_task();
     unsafe {
         let curr = *CURRENT_TX.get_mut();
         *CURRENT_TX.get_mut() = curr.wrapping_add(1);
@@ -91,6 +94,7 @@ fn execute_transaction(tx: &Transaction) -> bool {
 
 fn bundle_complete() -> ! {
     log!("transaction bundle complete");
+    write_kernel_result();
     // Avoid drop-time teardown that can allocate/deallocate; we halt immediately.
     let bundle = unsafe { BUNDLE.get_mut().take() };
     if let Some(bundle) = bundle {

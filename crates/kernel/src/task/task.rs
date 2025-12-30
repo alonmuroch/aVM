@@ -1,4 +1,5 @@
 use core::fmt;
+use types::result::Result as VmResult;
 
 /// Minimal trapframe capturing user-visible registers on trap/return.
 /// This mirrors RISC-V general-purpose regs plus PC.
@@ -55,6 +56,8 @@ pub struct Task {
     pub heap_ptr: u32,
     /// Task slot that initiated this task, if any.
     pub caller_task_id: Option<usize>,
+    /// Last decoded program result for this task, if any.
+    pub last_result: Option<VmResult>,
 }
 
 impl Task {
@@ -64,6 +67,7 @@ impl Task {
             addr_space,
             heap_ptr,
             caller_task_id: None,
+            last_result: None,
         }
     }
 

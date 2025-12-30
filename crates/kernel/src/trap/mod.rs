@@ -1,10 +1,13 @@
 use core::arch::asm;
 use program::{log, logf};
+use types::result::{Result as VmResult, RESULT_DATA_SIZE};
 
-use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, TASKS};
+use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, LAST_COMPLETED_TASK, TASKS};
 use crate::memory::page_allocator as mmu;
 use crate::syscall;
+use crate::syscall::storage::read_user_bytes;
 use crate::task::TRAMPOLINE_VA;
+use crate::{Config, Task};
 
 mod save_trap_frame;
 mod restore_trap_frame;
@@ -149,12 +152,23 @@ pub extern "C" fn handle_trap(saved: *mut u32) -> (u32, u32) {
                 // If this is a user task, save its current trapframe so it can be resumed later.
                 if current != KERNEL_TASK_SLOT {
                     if let Some(task) = tasks.get_mut(current) {
+                        if let Some(result) = read_task_result(task) {
+                            task.last_result = Some(result);
+                            log_task_result(&result);
+                        } else {
+                            log!("program result: failed to read result bytes");
+                        }
                         for (idx, value) in regs.iter().take(REG_COUNT).enumerate() {
                             task.tf.regs[idx] = *value;
                         }
                         task.tf.pc = regs[REG_PC];
                         // Use the recorded caller task as the return target.
                         caller_idx = task.caller_task_id.unwrap_or(KERNEL_TASK_SLOT);
+                        if caller_idx == KERNEL_TASK_SLOT {
+                            // Only record tasks that return to the kernel so bundle resume can
+                            // associate the completed task with the current transaction receipt.
+                            *LAST_COMPLETED_TASK.get_mut() = Some(current);
+                        }
                     }
                 }
                 // Restore the caller task's trapframe and address-space root.
@@ -216,6 +230,42 @@ fn read_sstatus() -> u32 {
     let value: u32;
     unsafe { asm!("csrr {0}, sstatus", out(reg) value); }
     value
+}
+
+fn read_task_result(task: &Task) -> Option<VmResult> {
+    let result_bytes =
+        read_user_bytes(task.addr_space.root_ppn, Config::RESULT_ADDR, Config::MAX_RESULT_SIZE)?;
+    if result_bytes.len() < 9 {
+        return None;
+    }
+    let success = result_bytes[0] != 0;
+    let error_code = u32::from_le_bytes(result_bytes[1..5].try_into().ok()?);
+    let data_len = u32::from_le_bytes(result_bytes[5..9].try_into().ok()?);
+    let data_len = (data_len as usize).min(RESULT_DATA_SIZE);
+    if result_bytes.len() < 9 + data_len {
+        return None;
+    }
+    let mut data = [0u8; RESULT_DATA_SIZE];
+    data[..data_len].copy_from_slice(&result_bytes[9..9 + data_len]);
+    Some(VmResult {
+        success,
+        error_code,
+        data_len: data_len as u32,
+        data,
+    })
+}
+
+fn log_task_result(result: &VmResult) {
+    let data_len = (result.data_len as usize).min(RESULT_DATA_SIZE);
+    logf!(
+        "program result: success=%d error=%d data_len=%d",
+        result.success as u32,
+        result.error_code,
+        data_len as u32
+    );
+    if data_len > 0 {
+        log!("program result data: %b", &result.data[..data_len]);
+    }
 }
 
 #[inline(always)]

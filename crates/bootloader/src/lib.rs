@@ -8,6 +8,7 @@
 //! Memory utilities are provided by the VM crate.
 
 pub mod bootloader;
+pub mod result;
 
 pub mod syscalls;
 

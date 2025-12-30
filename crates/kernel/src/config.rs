@@ -9,4 +9,6 @@ impl Config {
 
     pub const PROGRAM_START_ADDR: u32 = 0x400;
     pub const RESULT_ADDR: u32 = 0x100;
+    /// Kernel handoff header address for serialized receipts (kernel VA).
+    pub const KERNEL_RESULT_ADDR: u32 = 0x100;
 }

@@ -35,11 +35,20 @@ impl<T> Global<T> {
 
 unsafe impl<T> Sync for Global<T> {}
 
+/// Max number of task slots the kernel tracks at once.
 pub const MAX_TASKS: usize = 16;
+/// Reserved slot index for the kernel/supervisor task.
 pub const KERNEL_TASK_SLOT: usize = 0;
+/// Currently running task slot index (kernel or user).
 pub static CURRENT_TASK: Global<usize> = Global::new(KERNEL_TASK_SLOT);
+/// Index of the bundle transaction currently being executed.
 pub static CURRENT_TX: Global<usize> = Global::new(0);
+/// Task slot that most recently completed and returned to the kernel.
+/// Used to attach the correct program result to the current receipt.
+pub static LAST_COMPLETED_TASK: Global<Option<usize>> = Global::new(None);
+/// Active receipts buffer being filled while processing a bundle.
 pub static RECEIPTS: Global<Option<Vec<TransactionReceipt>>> = Global::new(None);
+/// Currently decoded bundle, if any.
 pub static BUNDLE: Global<Option<TransactionBundle>> = Global::new(None);
 
 pub struct TaskList {
