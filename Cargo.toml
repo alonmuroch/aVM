@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "crates/avm",
     "crates/compiler",
     "crates/examples",
     "crates/bootloader",

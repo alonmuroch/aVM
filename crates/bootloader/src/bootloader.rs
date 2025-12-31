@@ -10,7 +10,6 @@ use types::{boot::BootInfo, transaction::TransactionBundle, TransactionReceipt, 
 
 use crate::DefaultSyscallHandler;
 use state::State;
-use vm::host_interface::NoopHost;
 use vm::memory::{API, Perms, Sv32Memory, HEAP_PTR_OFFSET, Memory as MmuRef, VirtualAddress, PAGE_SIZE};
 use vm::registers::Register;
 use vm::vm::VM;
@@ -142,11 +141,8 @@ impl Bootloader {
         verbose_writer: Option<Rc<RefCell<dyn FmtWrite>>>,
     ) -> Option<Vec<TransactionReceipt>> {
         let (entry_point, memory) = self.load_kernel(kernel_elf);
-        let host: Box<dyn vm::host_interface::HostInterface> = Box::new(NoopHost);
-
         let mut vm = VM::new(
             memory.clone(),
-            host,
             Box::new(DefaultSyscallHandler::with_heap(
                 state.clone(),
                 Rc::clone(&self.heap_ptr),

@@ -1,5 +1,4 @@
 use crate::decoder::{decode_compressed, decode_full};
-use crate::host_interface::HostInterface;
 use crate::instruction::Instruction;
 use crate::memory::{Memory, VirtualAddress};
 use crate::metering::{MemoryAccessKind, MeterResult, Metering, NoopMeter};
@@ -287,7 +286,7 @@ impl CPU {
     /// worker (instruction) performs a specific task. The conveyor belt (PC)
     /// moves to the next task automatically, unless a task specifically
     /// redirects the flow (like a branch or jump instruction).
-    pub fn step(&mut self, memory: Memory, host: &mut Box<dyn HostInterface>) -> bool {
+    pub fn step(&mut self, memory: Memory) -> bool {
         // EDUCATIONAL: Step 1 - Fetch and decode the next instruction
         let instr = self.next_instruction(Rc::clone(&memory));
         
@@ -295,7 +294,7 @@ impl CPU {
         match instr {
             Some((instr, size)) => {
                 // Valid instruction found - execute it
-                self.run_instruction(instr, size, Rc::clone(&memory), host)
+                self.run_instruction(instr, size, Rc::clone(&memory))
             }
             None => {
                 // No valid instruction found - handle the error
@@ -322,7 +321,6 @@ impl CPU {
         instr: Instruction,
         size: u8,
         memory: Memory,
-        host: &mut Box<dyn HostInterface>,
     ) -> bool {
         // EDUCATIONAL: Debug output to help understand what's happening
         // Get the actual instruction bytes for debugging
@@ -358,7 +356,7 @@ impl CPU {
         let old_pc = self.pc;
 
         // EDUCATIONAL: Execute the instruction
-        let result = self.execute(instr.clone(), memory, host);
+        let result = self.execute(instr.clone(), memory);
         if !result {
             self.log(
                 &format!(

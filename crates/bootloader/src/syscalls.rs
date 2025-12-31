@@ -4,8 +4,7 @@ use std::any::Any;
 use std::rc::Rc;
 
 use state::State;
-use types::{ADDRESS_LEN, address::Address, result::RESULT_SIZE};
-use vm::host_interface::HostInterface;
+use types::{ADDRESS_LEN, address::Address};
 use vm::memory::{API, MMU, HEAP_PTR_OFFSET, Memory, Perms, VirtualAddress};
 use vm::metering::{MemoryAccessKind, MeterResult, Metering, NoopMeter};
 use vm::registers::Register;
@@ -126,7 +125,6 @@ impl SyscallHandler for DefaultSyscallHandler {
         args: [u32; 6],
         caller_mode: vm::cpu::PrivilegeMode,
         memory: Memory,
-        host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
         metering: &mut dyn Metering,
     ) -> (u32, bool) {
@@ -138,12 +136,12 @@ impl SyscallHandler for DefaultSyscallHandler {
             SYSCALL_STORAGE_SET => self.sys_storage_set(args, memory, metering),
             SYSCALL_PANIC => self.sys_panic_with_message(regs, memory),
             SYSCALL_LOG => self.sys_log(args, caller_mode, memory, metering),
-            SYSCALL_CALL_PROGRAM => self.sys_call_program(args, memory, host, metering),
-            SYSCALL_FIRE_EVENT => self.sys_fire_event(args, memory, host, metering),
+            SYSCALL_CALL_PROGRAM => self.sys_call_program(args, memory, metering),
+            SYSCALL_FIRE_EVENT => self.sys_fire_event(args, memory, metering),
             SYSCALL_ALLOC => self.sys_alloc(args, memory, metering),
             SYSCALL_DEALLOC => self.sys_dealloc(args, memory, metering),
-            SYSCALL_TRANSFER => self.sys_transfer(args, memory, host, metering),
-            SYSCALL_BALANCE => self.sys_balance(args, memory, host, metering),
+            SYSCALL_TRANSFER => self.sys_transfer(args, memory, metering),
+            SYSCALL_BALANCE => self.sys_balance(args, memory, metering),
             SYSCALL_BRK => self.sys_brk(args, memory, metering),
             _ => {
                 panic!("Unknown syscall: {}", call_id);
@@ -161,7 +159,6 @@ impl DefaultSyscallHandler {
         &mut self,
         args: [u32; 6],
         memory: Memory,
-        host: &mut Box<dyn HostInterface>,
         metering: &mut dyn Metering,
     ) -> u32 {
         // EDUCATIONAL: Extract key pointer and length from arguments
@@ -180,12 +177,11 @@ impl DefaultSyscallHandler {
         // EDUCATIONAL: Safely read the key from memory
         // EDUCATIONAL: Create a limited scope to avoid borrow checker issues
         let (start, end) = va_range(ptr, len);
-        let event_bytes = match borrowed_memory.mem_slice(start, end) {
+        let _event_bytes = match borrowed_memory.mem_slice(start, end) {
             Some(r) => r,
             None => panic!("invalid memory access"), // Invalid memory access
         };
 
-        host.fire_event(event_bytes.to_vec());
         0
     }
 
@@ -694,56 +690,35 @@ impl DefaultSyscallHandler {
         &mut self,
         args: [u32; 6],
         memory: Memory,
-        host: &mut Box<dyn HostInterface>,
         metering: &mut dyn Metering,
     ) -> u32 {
         let to_ptr = args[0] as usize;
         let from_ptr = args[1] as usize;
         let input_ptr = args[2] as usize;
         let input_len = args[3] as usize;
-        let result_ptr: u32;
-        let page_index: usize;
         if matches!(metering.on_call(input_len), MeterResult::Halt) {
             panic!("Metering halted SYSCALL_CALL_PROGRAM");
         }
         {
             let borrowed_memory = memory.as_ref();
             let (to_start, to_end) = va_range(to_ptr, 20);
-            let to_slice = match borrowed_memory.mem_slice(to_start, to_end) {
+            let _to_slice = match borrowed_memory.mem_slice(to_start, to_end) {
                 Some(r) => r,
                 None => return 0,
             };
             let (from_start, from_end) = va_range(from_ptr, 20);
-            let from_slice = match borrowed_memory.mem_slice(from_start, from_end) {
+            let _from_slice = match borrowed_memory.mem_slice(from_start, from_end) {
                 Some(r) => r,
                 None => return 0,
             };
             let (input_start, input_end) = va_range(input_ptr, input_len);
-            let input_slice = match borrowed_memory.mem_slice(input_start, input_end) {
+            let _input_slice = match borrowed_memory.mem_slice(input_start, input_end) {
                 Some(r) => r,
                 None => return 0,
             };
-            let mut to_bytes = [0u8; 20];
-            let mut from_bytes = [0u8; 20];
-            to_bytes.copy_from_slice(&to_slice);
-            from_bytes.copy_from_slice(&from_slice);
-            let input_vec = input_slice.to_vec();
-            (result_ptr, page_index) = host.call_program(from_bytes, to_bytes, input_vec);
         }
-        {
-            let borrowed_memory = memory.as_ref();
-            let result_bytes = match host.read_memory_page(page_index, result_ptr, RESULT_SIZE) {
-                Some(b) => b,
-                None => return 0,
-            };
-            if matches!(metering.on_alloc(result_bytes.len()), MeterResult::Halt) {
-                panic!("Metering halted alloc for call_program result");
-            }
-            match self.alloc_on_heap(&memory, &result_bytes, 8) {
-                Some(ptr) => ptr.as_u32(),
-                None => 0,
-            }
-        }
+        // Host integration removed; call_program is currently unsupported.
+        0
     }
 
     fn sys_alloc(&mut self, args: [u32; 6], memory: Memory, metering: &mut dyn Metering) -> u32 {
@@ -793,7 +768,6 @@ impl DefaultSyscallHandler {
         &mut self,
         args: [u32; 6],
         memory: Memory,
-        host: &mut Box<dyn HostInterface>,
         metering: &mut dyn Metering,
     ) -> u32 {
         // args: a2=to ptr, a3=value_lo, a4=value_hi
@@ -813,17 +787,17 @@ impl DefaultSyscallHandler {
         let (to_start, to_end) = va_range(to_ptr, 20);
         let to_slice = borrowed.mem_slice(to_start, to_end).expect("invalid to ptr");
 
-        let mut to = [0u8; 20];
-        to.copy_from_slice(to_slice.as_ref());
-
-        if host.transfer(to, value) { 0 } else { 1 }
+        let mut _to = [0u8; 20];
+        _to.copy_from_slice(to_slice.as_ref());
+        let _ = value;
+        // Host integration removed; transfer is currently unsupported.
+        1
     }
 
     fn sys_balance(
         &mut self,
         args: [u32; 6],
         memory: Memory,
-        host: &mut Box<dyn HostInterface>,
         metering: &mut dyn Metering,
     ) -> u32 {
         // args: a1 = address pointer (20 bytes)
@@ -845,7 +819,12 @@ impl DefaultSyscallHandler {
             addr
         };
 
-        let bal = host.balance(addr);
+        let bal = self
+            .state
+            .borrow()
+            .get_account(&Address(addr))
+            .map(|acc| acc.balance)
+            .unwrap_or(0);
         match self.alloc_on_heap(&memory, &bal.to_le_bytes(), 8) {
             Some(ptr) => ptr.as_u32(),
             None => 0,

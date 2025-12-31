@@ -1,7 +1,6 @@
 use super::{Instruction, MemoryAccessKind, Memory, CPU, CSR_SATP, CSR_SEPC, SCAUSE_BREAKPOINT};
 use crate::sys_call::SYSCALL_LOG;
 use crate::memory::VirtualAddress;
-use crate::host_interface::HostInterface;
 use crate::instruction::CsrOp;
 use crate::registers::Register;
 
@@ -29,7 +28,6 @@ impl CPU {
         &mut self,
         instr: Instruction,
         memory: Memory,
-        host: &mut Box<dyn HostInterface>,
     ) -> bool {
         match instr {
             // EDUCATIONAL: Arithmetic instructions - perform mathematical operations
@@ -810,7 +808,6 @@ impl CPU {
                     args,
                     self.priv_mode,
                     memory,
-                    host,
                     &mut self.regs,
                     self.metering.as_mut(),
                 );

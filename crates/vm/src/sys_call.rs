@@ -1,5 +1,4 @@
 use crate::cpu::PrivilegeMode;
-use crate::host_interface::HostInterface;
 use crate::memory::Memory;
 use crate::metering::Metering;
 use core::any::Any;
@@ -25,7 +24,6 @@ pub trait SyscallHandler: std::fmt::Debug {
         args: [u32; 6],
         caller_mode: PrivilegeMode,
         memory: Memory,
-        host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
         metering: &mut dyn Metering,
     ) -> (u32, bool);

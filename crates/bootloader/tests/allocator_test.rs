@@ -2,16 +2,14 @@ use bootloader::DefaultSyscallHandler;
 use state::State;
 use std::cell::RefCell;
 use std::rc::Rc;
-use vm::host_interface;
 use vm::memory::{Memory, Sv32Memory, PAGE_SIZE};
 use vm::metering::NoopMeter;
-use vm::sys_call::{SyscallHandler, SYSCALL_ALLOC, SYSCALL_DEALLOC};
+use vm::sys_call::{SYSCALL_ALLOC, SYSCALL_DEALLOC};
 
 #[test]
 fn test_allocator_syscalls() {
     let memory: Memory = Rc::new(Sv32Memory::new(8192, PAGE_SIZE));
     let state = Rc::new(RefCell::new(State::new()));
-    let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new(state.clone());
     let mut meter = NoopMeter::default();
 
@@ -23,7 +21,6 @@ fn test_allocator_syscalls() {
         args,
         vm::cpu::PrivilegeMode::Supervisor,
         memory.clone(),
-        &mut host,
         &mut regs,
         &mut meter,
     );
@@ -37,7 +34,6 @@ fn test_allocator_syscalls() {
         dealloc_args,
         vm::cpu::PrivilegeMode::Supervisor,
         memory.clone(),
-        &mut host,
         &mut regs,
         &mut meter,
     );
@@ -49,7 +45,6 @@ fn test_allocator_syscalls() {
 fn test_multiple_allocations() {
     let memory: Memory = Rc::new(Sv32Memory::new(8192, PAGE_SIZE));
     let state = Rc::new(RefCell::new(State::new()));
-    let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new(state.clone());
     let mut regs = [0u32; 32];
     let mut meter = NoopMeter::default();
@@ -66,7 +61,6 @@ fn test_multiple_allocations() {
             args,
             vm::cpu::PrivilegeMode::Supervisor,
             memory.clone(),
-            &mut host,
             &mut regs,
             &mut meter,
         );
@@ -92,7 +86,6 @@ fn test_multiple_allocations() {
 fn test_alignment_requirements() {
     let memory: Memory = Rc::new(Sv32Memory::new(8192, PAGE_SIZE));
     let state = Rc::new(RefCell::new(State::new()));
-    let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new(state.clone());
     let mut regs = [0u32; 32];
     let mut meter = NoopMeter::default();
@@ -107,7 +100,6 @@ fn test_alignment_requirements() {
             args,
             vm::cpu::PrivilegeMode::Supervisor,
             memory.clone(),
-            &mut host,
             &mut regs,
             &mut meter,
         );
@@ -121,7 +113,6 @@ fn test_alignment_requirements() {
 fn test_invalid_alignment() {
     let memory: Memory = Rc::new(Sv32Memory::new(8192, PAGE_SIZE));
     let state = Rc::new(RefCell::new(State::new()));
-    let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new(state.clone());
     let mut regs = [0u32; 32];
     let mut meter = NoopMeter::default();
@@ -136,7 +127,6 @@ fn test_invalid_alignment() {
             args,
             vm::cpu::PrivilegeMode::Supervisor,
             memory.clone(),
-            &mut host,
             &mut regs,
             &mut meter,
         );

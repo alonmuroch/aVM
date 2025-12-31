@@ -1,5 +1,4 @@
 use crate::cpu::CPU;
-use crate::host_interface::HostInterface;
 use crate::memory::{API, Memory};
 use crate::metering::Metering;
 use crate::registers::Register;
@@ -28,35 +27,25 @@ pub struct VM {
     /// Shared reference to the VM's memory (RAM)
     pub memory: Memory,
 
-    pub host: Box<dyn HostInterface>,
 }
 
 impl VM {
-    /// Creates a new virtual machine with the specified memory, host, and syscall handler.
+    /// Creates a new virtual machine with the specified memory and syscall handler.
     pub fn new(
         memory: Memory,
-        host: Box<dyn HostInterface>,
         syscall_handler: Box<dyn SyscallHandler>,
     ) -> Self {
-        Self::new_with_syscall_handler(memory, host, syscall_handler)
+        Self::new_with_syscall_handler(memory, syscall_handler)
     }
 
     /// Creates a new virtual machine with a custom syscall handler.
     /// This is useful for testing or custom environments.
-    pub fn new_with_syscall_handler(
-        memory: Memory,
-        host: Box<dyn HostInterface>,
-        syscall_handler: Box<dyn SyscallHandler>,
-    ) -> Self {
+    pub fn new_with_syscall_handler(memory: Memory, syscall_handler: Box<dyn SyscallHandler>) -> Self {
         let mut cpu = CPU::new(syscall_handler);
         cpu.regs[Register::Sp as usize] = memory.stack_top().as_u32();
         let satp = memory.satp();
         cpu.set_satp(&memory, satp);
-        Self {
-            cpu,
-            memory,
-            host,
-        }
+        Self { cpu, memory }
     }
 
     /// Installs a metering implementation on the underlying CPU.
@@ -178,6 +167,6 @@ impl VM {
     /// call this after setting up the initial state.
     pub fn raw_run(&mut self) {
         // EDUCATIONAL: Main execution loop - fetch, decode, execute
-        while self.cpu.step(Rc::clone(&self.memory), &mut self.host) {}
+        while self.cpu.step(Rc::clone(&self.memory)) {}
     }
 }
