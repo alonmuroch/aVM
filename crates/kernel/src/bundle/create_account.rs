@@ -1,7 +1,7 @@
 use kernel::global::STATE;
 use kernel::Config;
-use program::logf;
-use program::parser::HexCodec;
+use clibc::logf;
+use clibc::parser::HexCodec;
 use state::State;
 use types::transaction::Transaction;
 

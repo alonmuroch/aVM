@@ -1,11 +1,11 @@
 #![no_std]
 #![no_main]
 
-extern crate program;
+extern crate clibc;
 
-use program::types::address::Address;
-use program::types::result::Result;
-use program::{DataParser, entrypoint, require};
+use clibc::types::address::Address;
+use clibc::types::result::Result;
+use clibc::{DataParser, entrypoint, require};
 
 /// Demonstrates transferring the native AM token from the caller to a target
 /// address using the VM's transfer syscall. The input payload is:
@@ -21,9 +21,9 @@ fn transfer_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
     let amount = parser.read_u64();
 
     // Capture recipient balance before/after for return value
-    let _before = program::balance!(&to);
-    let ok = program::transfer!(&to, amount);
-    let after = program::balance!(&to);
+    let _before = clibc::balance!(&to);
+    let ok = clibc::transfer!(&to, amount);
+    let after = clibc::balance!(&to);
 
     // Encode success flag in data for easier assertions
     let mut result = Result::new(ok, if ok { 0 } else { 1 });

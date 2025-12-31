@@ -1,11 +1,11 @@
 #![no_std]
 #![no_main]
 
-extern crate program;
+extern crate clibc;
 
-use program::router::route;
-use program::types::address::Address;
-use program::{DataParser, entrypoint, require, types::result::Result, vm_panic};
+use clibc::router::route;
+use clibc::types::address::Address;
+use clibc::{DataParser, entrypoint, require, types::result::Result, vm_panic};
 
 /// Main entry point for the smart contract.
 ///

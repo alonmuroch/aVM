@@ -11,7 +11,7 @@ default = []
 guest_kernel = []
 
 [dependencies]
-program = { path = "../program", features = ["kernel"] }
+clibc = { path = "../clibc", features = ["kernel"] }
 types = { path = "../types" }
 state = { path = "../state" }
 

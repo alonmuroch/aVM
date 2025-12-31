@@ -116,7 +116,7 @@ rust-vm/
 │   │       ├── storage.rs     # Storage system examples
 │   │       ├── multi_func.rs  # Multi-function contract
 │   │       └── call_program.rs # Cross-program calls
-│   ├── program/       # Smart contract runtime library
+│   ├── clibc/         # Chain Libc smart contract runtime library
 │   ├── state/         # Blockchain state management
 │   ├── storage/       # Persistent storage system
 │   ├── types/         # Common types and data structures

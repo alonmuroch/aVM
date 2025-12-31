@@ -3,7 +3,7 @@
 
 extern crate alloc;
 
-use program::{
+use clibc::{
     DataParser, entrypoint, require, types::address::Address, types::result::Result, vm_panic,
 };
 

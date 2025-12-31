@@ -1,6 +1,6 @@
 use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, TASKS};
 use crate::memory::page_allocator as mmu;
-use program::logf;
+use clibc::logf;
 
 use super::{REG_A0, REG_A1, REG_A2, REG_A3, REG_SP, TRAMPOLINE_VA, TRAP_TRAMPOLINE_VA};
 

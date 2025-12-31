@@ -13,7 +13,7 @@ Alon's OS (OS) is a minimal operating system purpose-built for deterministic, bl
 1. **Bootloader**: First-stage loader that verifies the kernel and `liba` images, measures them, and passes a concise boot manifest to the kernel. Runs in a restricted environment with no dynamic allocation.
 2. **Kernel**: Manages memory layout, page tables, capabilities, and the syscall surface. Provides deterministic scheduling and ties block context (slot, leader, parent state root) to every execution.
 3. **Execution Runtime**: The blockchain-aware executor that will supersede `avm`. It coordinates transaction/block execution, drives the VM, and emits receipts and event logs.
-4. **liba (Standard Library)**: Successor of the `program` crate, offering safe wrappers over syscalls (storage, logs, crypto, messaging), ABI helpers, and contract-to-contract call utilities.
+4. **liba (Standard Library)**: Successor of the `clibc` crate, offering safe wrappers over syscalls (storage, logs, crypto, messaging), ABI helpers, and contract-to-contract call utilities.
 5. **Tooling**: Compiler and host utilities reused from the existing workspace to build and package aOS images and applications.
 
 ## Component Details
@@ -34,7 +34,7 @@ Alon's OS (OS) is a minimal operating system purpose-built for deterministic, bl
 - Provides hooks for precompiles and deterministic host functions.
 
 ### liba (Application Standard Library)
-- Derived from the existing `program` crate and tailored to aOS.
+- Derived from the existing `clibc` crate and tailored to aOS.
 - Offers ABI types, context helpers, and safe wrappers around syscalls exposed by the kernel.
 - Ships default modules for storage, logging/events, cross-program calls, and crypto utilities.
 
@@ -47,12 +47,12 @@ Alon's OS (OS) is a minimal operating system purpose-built for deterministic, bl
 
 ## Relationship to Existing Workspace
 - `os` replaces the `avm` crate as the orchestrator/runtime.
-- `program` is internalized as `liba` inside this crate (module structure will mirror the current APIs).
+- `clibc` is internalized as `liba` inside this crate (module structure will mirror the current APIs).
 - `vm`, `state`, `storage`, `types`, and `compiler` remain the core building blocks for CPU execution, state transitions, persistence, shared types, and toolchain support.
 
 ## Roadmap (Initial Steps)
 - Define kernel <-> runtime <-> `liba` interfaces and shared types.
-- Port `program` into `liba` and expose it as the supported app-facing API.
+- Port `clibc` into `liba` and expose it as the supported app-facing API.
 - Migrate `avm` responsibilities into the aOS runtime and deprecate `avm`.
 - Add a boot manifest format and minimal bootloader stubs to validate and launch the kernel.
 - Document syscall semantics and determinism guarantees for contract authors.

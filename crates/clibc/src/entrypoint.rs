@@ -11,7 +11,7 @@
 /// 
 /// USAGE: Call this macro with the name of your main contract function:
 /// ```ignore
-/// use program::entrypoint;
+/// use clibc::entrypoint;
 /// entrypoint!(my_contract_function);
 /// ```
 /// 

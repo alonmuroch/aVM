@@ -1,9 +1,9 @@
 #![no_std]
 #![no_main]
 
-extern crate program;
+extern crate clibc;
 use k256::ecdsa::{Signature, VerifyingKey, signature::hazmat::PrehashVerifier};
-use program::{
+use clibc::{
     DataParser, HexCodec, entrypoint, log, logf, require, types::address::Address,
     types::result::Result, vm_panic,
 };

@@ -1,7 +1,7 @@
 extern crate alloc;
 
 use alloc::format;
-use program::logf;
+use clibc::logf;
 use state::State;
 use types::address::Address;
 

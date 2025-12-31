@@ -1,9 +1,9 @@
 #![no_std]
 #![no_main]
 
-extern crate program;
-use program::types::address::Address;
-use program::{DataParser, entrypoint, require, types::result::Result};
+extern crate clibc;
+use clibc::types::address::Address;
+use clibc::{DataParser, entrypoint, require, types::result::Result};
 
 /// Simple smart contract that compares two 32-bit integers.
 ///

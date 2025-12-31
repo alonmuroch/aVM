@@ -1,6 +1,6 @@
 use kernel::Config;
 use kernel::global::{CURRENT_TX, LAST_COMPLETED_TASK, RECEIPTS, TASKS};
-use program::{log, logf};
+use clibc::{log, logf};
 use types::{KernelResult, TransactionReceipt};
 
 pub(crate) fn update_receipt_from_task() {

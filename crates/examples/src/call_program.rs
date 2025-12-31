@@ -1,11 +1,11 @@
 #![no_std]
 #![no_main]
 
-extern crate program;
+extern crate clibc;
 
-use program::call::call;
-use program::types::address::Address;
-use program::{DataParser, entrypoint, require, types::result::Result, vm_panic};
+use clibc::call::call;
+use clibc::types::address::Address;
+use clibc::{DataParser, entrypoint, require, types::result::Result, vm_panic};
 
 // Include the auto-generated ABI client code for simple program
 include!("../bin/simple_abi.rs");

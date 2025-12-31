@@ -3,7 +3,7 @@ extern crate alloc;
 use alloc::{format, string::String, vec, vec::Vec};
 use core::cmp;
 
-use program::{log, logf};
+use clibc::{log, logf};
 use types::{Address, ADDRESS_LEN, SV32_DIRECT_MAP_BASE, SV32_PAGE_SIZE};
 
 use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, STATE, TASKS};

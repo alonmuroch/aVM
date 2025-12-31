@@ -27,9 +27,9 @@ impl AbiCodeGenerator {
         
         // Don't add imports - assume they're in the parent file
         code.push_str("// Note: This code assumes the following imports in the parent file:\n");
-        code.push_str("// use program::types::address::Address;\n");
-        code.push_str("// use program::types::result::Result;\n");
-        code.push_str("// use program::call::call;\n\n");
+        code.push_str("// use clibc::types::address::Address;\n");
+        code.push_str("// use clibc::types::result::Result;\n");
+        code.push_str("// use clibc::call::call;\n\n");
         
         // Generate contract struct
         code.push_str(&format!("/// Client for interacting with {} contract\n", self.contract_name));

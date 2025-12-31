@@ -1,6 +1,6 @@
 use core::{cmp, slice};
 
-use program::{log, logf};
+use clibc::{log, logf};
 use state::State;
 
 use kernel::global::{CURRENT_TASK, KERNEL_TASK_SLOT, STATE, TASKS};

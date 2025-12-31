@@ -1,9 +1,9 @@
 #![no_std]
 #![no_main]
 
-extern crate program;
-use program::types::address::Address;
-use program::{entrypoint, require, types::result::Result};
+extern crate clibc;
+use clibc::types::address::Address;
+use clibc::{entrypoint, require, types::result::Result};
 
 // Import the sha2 library for hashing
 use sha2::{Digest, Sha256};

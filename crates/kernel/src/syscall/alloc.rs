@@ -1,4 +1,4 @@
-use program::{log, logf};
+use clibc::{log, logf};
 
 use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, TASKS};
 use crate::Task;

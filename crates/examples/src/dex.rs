@@ -1,9 +1,9 @@
 #![no_std]
 #![no_main]
 
-extern crate program;
+extern crate clibc;
 
-use program::{
+use clibc::{
     DataParser, Map,
     call::call,
     entrypoint, event, fire_event, hex_address, persist_struct, require, transfer,

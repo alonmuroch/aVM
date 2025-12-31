@@ -1,10 +1,10 @@
 #![no_std]
 #![no_main]
 
-extern crate program;
-use program::persist_struct;
-use program::types::address::Address;
-use program::{entrypoint, require, types::result::Result};
+extern crate clibc;
+use clibc::persist_struct;
+use clibc::types::address::Address;
+use clibc::{entrypoint, require, types::result::Result};
 
 // Struct 1: User profile
 persist_struct!(User {

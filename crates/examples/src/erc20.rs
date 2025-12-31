@@ -1,8 +1,8 @@
 #![no_std]
 #![no_main]
 
-extern crate program;
-use program::{
+extern crate clibc;
+use clibc::{
     DataParser, Map, entrypoint, event, fire_event, log, logf, persist_struct, require,
     router::route,
     types::{address::Address, o::O, result::Result},

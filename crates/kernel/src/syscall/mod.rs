@@ -1,8 +1,8 @@
 //! Kernel-owned syscall stubs. These mirror the bootloader syscalls but
 //! are now dispatched from the kernel trap handler. Implementations will
 //! land here; for now they panic to make missing pieces explicit.
-use program::{log, logf};
-use program::syscalls::{
+use clibc::{log, logf};
+use clibc::syscalls::{
     SYSCALL_ALLOC, SYSCALL_BALANCE, SYSCALL_BRK, SYSCALL_CALL_PROGRAM, SYSCALL_DEALLOC,
     SYSCALL_FIRE_EVENT, SYSCALL_PANIC, SYSCALL_STORAGE_GET, SYSCALL_STORAGE_SET,
     SYSCALL_TRANSFER,

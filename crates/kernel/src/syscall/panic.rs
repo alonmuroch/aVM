@@ -1,4 +1,4 @@
-use program::{log, logf};
+use clibc::{log, logf};
 use types::{SV32_DIRECT_MAP_BASE, SV32_PAGE_SIZE};
 
 use crate::global::{CURRENT_TASK, TASKS};

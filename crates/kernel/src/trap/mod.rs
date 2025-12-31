@@ -1,5 +1,5 @@
 use core::arch::asm;
-use program::{log, logf};
+use clibc::{log, logf};
 use types::result::{Result as VmResult, RESULT_DATA_SIZE};
 
 use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, LAST_COMPLETED_TASK, TASKS};

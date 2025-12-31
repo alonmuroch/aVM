@@ -1,4 +1,4 @@
-use program::logf;
+use clibc::logf;
 
 use crate::global::{CURRENT_TX, RECEIPTS};
 use crate::syscall::storage::{current_root_ppn, read_user_bytes};

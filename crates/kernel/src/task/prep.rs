@@ -1,7 +1,7 @@
 use crate::{AddressSpace, Config, Task};
 use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, TASKS};
 use crate::memory::page_allocator as mmu;
-use program::{log, logf};
+use clibc::{log, logf};
 use types::address::Address;
 
 use super::{

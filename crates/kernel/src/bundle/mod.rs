@@ -3,7 +3,7 @@ use core::mem::forget;
 extern crate alloc;
 
 use alloc::vec::Vec;
-use program::{log, logf};
+use clibc::{log, logf};
 use types::transaction::{Transaction, TransactionBundle, TransactionType};
 use types::{Result, TransactionReceipt};
 

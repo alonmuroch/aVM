@@ -1,4 +1,4 @@
-use program::router::{decode_calls, route, FuncCall};
+use clibc::router::{decode_calls, route, FuncCall};
 use types::{Result, Address};
 
 #[test]

@@ -26,7 +26,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 
     let mut buf = [0u8; 256];
     let len = {
-        let mut writer = program::BufferWriter::new(&mut buf);
+        let mut writer = clibc::BufferWriter::new(&mut buf);
         if write!(&mut writer, "{}", info).is_ok() {
             writer.len()
         } else {
@@ -34,9 +34,9 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
         }
     };
     if len == 0 {
-        program::log!("kernel panic");
+        clibc::log!("kernel panic");
     } else {
-        program::logf!("kernel panic: %s", buf.as_ptr() as u32, len as u32);
+        clibc::logf!("kernel panic: %s", buf.as_ptr() as u32, len as u32);
     }
     unsafe { core::arch::asm!("ebreak") };
     loop {}
