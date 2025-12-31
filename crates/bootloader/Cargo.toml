@@ -15,6 +15,7 @@ vm = { path = "../vm" }
 state = { path = "../state" }
 goblin = "0.10"
 compiler = { path = "../compiler" }
+program = { path = "../program" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 program = { path = "../program", default-features = false }

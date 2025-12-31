@@ -2,7 +2,6 @@ use crate::decoder::{decode_compressed, decode_full};
 use crate::instruction::Instruction;
 use crate::memory::{Memory, VirtualAddress};
 use crate::metering::{MemoryAccessKind, MeterResult, Metering, NoopMeter};
-use crate::sys_call::SyscallHandler;
 use core::cell::RefCell;
 use core::fmt::Write;
 use std::collections::HashMap;
@@ -77,8 +76,6 @@ pub struct CPU {
     /// EDUCATIONAL: This helps students understand what the CPU is doing
     /// by printing each instruction as it executes
     pub verbose: bool,
-    pub syscall_handler: Box<dyn SyscallHandler>,
-    
     /// Reservation address for LR/SC atomic operations
     /// EDUCATIONAL: This implements the Load-Reserved/Store-Conditional
     /// mechanism for atomic memory operations in RISC-V
@@ -124,20 +121,18 @@ impl CPU {
     /// - PC starts at 0 (first instruction)
     /// - All registers start at 0 (except x0 which is always 0)
     /// - Verbose logging is disabled by default
-    pub fn new(syscall_handler: Box<dyn SyscallHandler>) -> Self {
-        Self::with_metering(syscall_handler, Box::new(NoopMeter::default()))
+    pub fn new() -> Self {
+        Self::with_metering(Box::new(NoopMeter::default()))
     }
 
     /// Creates a new CPU instance with a custom metering implementation.
     pub fn with_metering(
-        syscall_handler: Box<dyn SyscallHandler>,
         metering: Box<dyn Metering>,
     ) -> Self {
         Self {
             pc: 0,
             regs: [0; 32],
             verbose: false,
-            syscall_handler,
             reservation_addr: None,
             verbose_writer: None,
             metering,

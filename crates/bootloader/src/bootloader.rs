@@ -8,7 +8,6 @@ use compiler::elf::parse_elf_from_bytes;
 use goblin::elf::Elf;
 use types::{boot::BootInfo, transaction::TransactionBundle, TransactionReceipt, SV32_DIRECT_MAP_BASE};
 
-use crate::DefaultSyscallHandler;
 use state::State;
 use vm::memory::{API, Perms, Sv32Memory, HEAP_PTR_OFFSET, Memory as MmuRef, VirtualAddress, PAGE_SIZE};
 use vm::registers::Register;
@@ -141,13 +140,7 @@ impl Bootloader {
         verbose_writer: Option<Rc<RefCell<dyn FmtWrite>>>,
     ) -> Option<Vec<TransactionReceipt>> {
         let (entry_point, memory) = self.load_kernel(kernel_elf);
-        let mut vm = VM::new(
-            memory.clone(),
-            Box::new(DefaultSyscallHandler::with_heap(
-                state.clone(),
-                Rc::clone(&self.heap_ptr),
-            )),
-        );
+        let mut vm = VM::new(memory.clone());
         vm.set_reg_u32(Register::Sp, KERNEL_STACK_TOP);
         vm.cpu.verbose = verbose;
         if let Some(writer) = verbose_writer {

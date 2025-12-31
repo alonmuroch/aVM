@@ -1,15 +1,18 @@
+pub const CONSOLE_WRITE_ID: u32 = 1000;
+
 #[macro_export]
 macro_rules! logf_syscall {
     ($fmt_ptr:expr, $fmt_len:expr, $args_ptr:expr, $args_len:expr) => {{
         #[cfg(target_arch = "riscv32")]
         unsafe {
             core::arch::asm!(
-                "li a7, 100",  // syscall_log
+                "li a7, {console_write}",
                 "ecall",
                 in("a1") $fmt_ptr,
                 in("a2") $fmt_len,
                 in("a3") $args_ptr,
                 in("a4") $args_len,
+                console_write = const $crate::CONSOLE_WRITE_ID,
                 clobber_abi("C"),
             );
         }
@@ -25,6 +28,9 @@ macro_rules! logf {
     ($fmt:expr) => {{
         // Handle both string literals and byte strings
         let fmt_bytes: &[u8] = $crate::as_bytes!($fmt);
+        let prefix_bytes = $crate::LOG_PREFIX.as_bytes();
+        let mut fmt_buf = [0u8; 256];
+        let fmt_bytes = $crate::concat_str!(fmt_buf, prefix_bytes, fmt_bytes);
         let fmt_ptr = fmt_bytes.as_ptr();
         let fmt_len = fmt_bytes.len();
         $crate::logf_syscall!(fmt_ptr, fmt_len, 0 as *const u32, 0usize);
@@ -84,6 +90,9 @@ macro_rules! logf {
         )+
         
         let fmt_bytes: &[u8] = $crate::as_bytes!($fmt);
+        let prefix_bytes = $crate::LOG_PREFIX.as_bytes();
+        let mut fmt_buf = [0u8; 256];
+        let fmt_bytes = $crate::concat_str!(fmt_buf, prefix_bytes, fmt_bytes);
         let fmt_ptr = fmt_bytes.as_ptr();
         let fmt_len = fmt_bytes.len();
         let args_ptr = args_buf.as_ptr();

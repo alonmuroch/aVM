@@ -2,7 +2,6 @@ use crate::cpu::CPU;
 use crate::memory::{API, Memory};
 use crate::metering::Metering;
 use crate::registers::Register;
-use crate::sys_call::SyscallHandler;
 use std::rc::Rc;
 
 /// Represents a complete RISC-V virtual machine.
@@ -30,18 +29,9 @@ pub struct VM {
 }
 
 impl VM {
-    /// Creates a new virtual machine with the specified memory and syscall handler.
-    pub fn new(
-        memory: Memory,
-        syscall_handler: Box<dyn SyscallHandler>,
-    ) -> Self {
-        Self::new_with_syscall_handler(memory, syscall_handler)
-    }
-
-    /// Creates a new virtual machine with a custom syscall handler.
-    /// This is useful for testing or custom environments.
-    pub fn new_with_syscall_handler(memory: Memory, syscall_handler: Box<dyn SyscallHandler>) -> Self {
-        let mut cpu = CPU::new(syscall_handler);
+    /// Creates a new virtual machine with the specified memory.
+    pub fn new(memory: Memory) -> Self {
+        let mut cpu = CPU::new();
         cpu.regs[Register::Sp as usize] = memory.stack_top().as_u32();
         let satp = memory.satp();
         cpu.set_satp(&memory, satp);

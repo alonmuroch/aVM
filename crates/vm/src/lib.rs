@@ -1,4 +1,5 @@
 pub mod cpu;
+pub mod console;
 pub mod decoder;
 pub mod instruction;
 pub mod isa;
@@ -6,5 +7,4 @@ pub mod isa_compressed;
 pub mod memory;
 pub mod metering;
 pub mod registers;
-pub mod sys_call;
 pub mod vm;

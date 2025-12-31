@@ -5,6 +5,7 @@ edition = "2024"
 
 [features]
 guest = []
+kernel = []
 
 [dependencies]
 types = { path = "../types" }

@@ -1,5 +1,5 @@
 use super::{Instruction, MemoryAccessKind, Memory, CPU, CSR_SATP, CSR_SEPC, SCAUSE_BREAKPOINT};
-use crate::sys_call::SYSCALL_LOG;
+use crate::console::{console_write, CONSOLE_WRITE_ID};
 use crate::memory::VirtualAddress;
 use crate::instruction::CsrOp;
 use crate::registers::Register;
@@ -791,30 +791,32 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                if self.has_trap_vector() {
-                    // Bypass trap for logging syscalls so they execute directly.
-                    if call_id != SYSCALL_LOG {
-                        if !self.trap_to_vector(self.ecall_cause(), 0, Some(call_id)) {
-                            panic!(
-                                "trap_to_vector returned false for ecall id={} pc=0x{:08x}",
-                                call_id, self.pc
-                            );
-                        }
-                        return true;
+                if call_id == CONSOLE_WRITE_ID {
+                    let result = console_write(
+                        args,
+                        self.priv_mode,
+                        memory,
+                        self.metering.as_mut(),
+                        &self.verbose_writer,
+                    );
+                    if !self.write_reg(Register::A0 as usize, result) {
+                        return false;
                     }
+                    return true;
                 }
-                let (result, cont) = self.syscall_handler.handle_syscall(
-                    call_id,
-                    args,
-                    self.priv_mode,
-                    memory,
-                    &mut self.regs,
-                    self.metering.as_mut(),
+                if self.has_trap_vector() {
+                    if !self.trap_to_vector(self.ecall_cause(), 0, Some(call_id)) {
+                        panic!(
+                            "trap_to_vector returned false for ecall id={} pc=0x{:08x}",
+                            call_id, self.pc
+                        );
+                    }
+                    return true;
+                }
+                panic!(
+                    "ecall without trap vector for id={} pc=0x{:08x}",
+                    call_id, self.pc
                 );
-                if !self.write_reg(Register::A0 as usize, result) {
-                    return false;
-                }
-                return cont;
             }
             Instruction::Csr {
                 rd,

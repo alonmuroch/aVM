@@ -9,9 +9,3 @@
 
 pub mod bootloader;
 pub mod result;
-
-pub mod syscalls;
-
-pub use vm::sys_call;
-
-pub use syscalls::DefaultSyscallHandler;

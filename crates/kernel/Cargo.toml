@@ -11,7 +11,7 @@ default = []
 guest_kernel = []
 
 [dependencies]
-program = { path = "../program" }
+program = { path = "../program", features = ["kernel"] }
 types = { path = "../types" }
 state = { path = "../state" }
 

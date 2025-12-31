@@ -20,6 +20,10 @@ pub mod transfer;
 pub use transfer::transfer;
 pub use transfer::balance;
 
+// Syscall IDs
+pub mod syscalls;
+pub use syscalls::*;
+
 // StorageMap
 pub mod storage_map;
 pub use storage_map::StorageMap;
@@ -32,6 +36,14 @@ pub use event::*;
 // Logging macros
 pub mod log;
 pub use log::BufferWriter;
+pub use log::CONSOLE_WRITE_ID;
+
+#[cfg(feature = "kernel")]
+pub const LOG_PREFIX: &str = "🛡️ Kernel: ";
+#[cfg(all(not(feature = "kernel"), feature = "guest"))]
+pub const LOG_PREFIX: &str = "📜 Guest: ";
+#[cfg(all(not(feature = "kernel"), not(feature = "guest")))]
+pub const LOG_PREFIX: &str = "";
 
 // Data parser
 pub mod parser;
