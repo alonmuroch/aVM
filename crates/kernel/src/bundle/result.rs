@@ -1,5 +1,6 @@
 use kernel::Config;
-use kernel::global::{CURRENT_TX, LAST_COMPLETED_TASK, RECEIPTS, TASKS};
+use kernel::global::{CURRENT_TX, LAST_COMPLETED_TASK, RECEIPTS, STATE, TASKS};
+use kernel::memory::heap;
 use clibc::{log, logf};
 use types::{KernelResult, TransactionReceipt};
 
@@ -61,9 +62,31 @@ pub(crate) fn write_kernel_result() {
     // physical address in the current setup.
     let ptr = encoded.as_ptr() as u32;
     core::mem::forget(encoded);
+    let (state_ptr, state_len) = match unsafe { STATE.get_mut().as_ref() } {
+        Some(state) => {
+            let len = state.encoded_len();
+            if len == 0 {
+                (0, 0)
+            } else {
+                match heap::alloc(len, 8) {
+                    Some(ptr) => {
+                        let buf = unsafe { core::slice::from_raw_parts_mut(ptr, len) };
+                        match state.encode_into(buf) {
+                            Some(written) => (ptr as u32, written as u32),
+                            None => (0, 0),
+                        }
+                    }
+                    None => (0, 0),
+                }
+            }
+        }
+        None => (0, 0),
+    };
     let header = KernelResult {
         receipts_ptr: ptr,
         receipts_len: len,
+        state_ptr,
+        state_len,
     };
     unsafe {
         core::ptr::write_volatile(Config::KERNEL_RESULT_ADDR as *mut KernelResult, header);

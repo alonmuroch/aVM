@@ -13,8 +13,10 @@ pub mod call_program;
 pub mod fire_event;
 pub mod panic;
 pub mod storage;
+pub mod balance;
 
 use alloc::{sys_alloc, sys_dealloc};
+use balance::{sys_balance, sys_transfer};
 use call_program::sys_call_program;
 use fire_event::sys_fire_event;
 use panic::sys_panic;
@@ -53,16 +55,6 @@ pub fn dispatch_syscall(call_id: u32, args: [u32; 6], ctx: &mut SyscallContext<'
             0
         }
     }
-}
-
-fn sys_transfer(_args: [u32; 6]) -> u32 {
-    log!("sys_transfer: need implementation");
-    0
-}
-
-fn sys_balance(_args: [u32; 6]) -> u32 {
-    log!("sys_balance: need implementation");
-    0
 }
 
 fn sys_brk(_args: [u32; 6]) -> u32 {

@@ -6,6 +6,4 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-hex = { version = "0.4", default-features = false, features = ["alloc"] }
 types = { path = "../types" }  # adjust path as needed
-storage = { path = "../storage", optional = true }  # adjust path as needed

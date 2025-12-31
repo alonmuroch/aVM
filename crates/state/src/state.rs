@@ -1,15 +1,8 @@
 use alloc::collections::BTreeMap;
-use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-#[cfg(feature = "std")]
-use std::rc::Rc;
-#[cfg(feature = "std")]
-use storage::Storage;
 use crate::Account;
 use types::address::Address;
-#[cfg(feature = "std")]
-use hex::encode as hex_encode;
 
 /// Represents the global state of the blockchain virtual machine.
 /// 
@@ -68,20 +61,6 @@ impl State {
         Self { accounts: BTreeMap::new() }
     }
 
-    /// Constructs a State from an existing Storage instance.
-    /// 
-    /// EDUCATIONAL PURPOSE: This demonstrates how state can be reconstructed
-    /// from persistent storage. In real blockchains, the state is often
-    /// stored on disk and loaded into memory when needed.
-    /// 
-    /// NOTE: This is currently a placeholder implementation that always
-    /// returns an empty state. In a real system, this would deserialize
-    /// the state from the provided storage.
-    #[cfg(feature = "std")]
-    pub fn new_from_storage(_storage: Rc<Storage>) -> Self {
-        Self { accounts: BTreeMap::new() }
-    }
-
     /// Retrieves an account by address (immutable reference).
     /// 
     /// EDUCATIONAL PURPOSE: This demonstrates safe account access for reading.
@@ -97,6 +76,14 @@ impl State {
     /// RETURNS: Some(account) if the account exists, None otherwise
     pub fn get_account(&self, addr: &Address) -> Option<&Account> {
         self.accounts.get(addr)
+    }
+
+    /// Returns the current balance for an address (0 if missing).
+    pub fn balance_of(&self, addr: &Address) -> u128 {
+        self.accounts
+            .get(addr)
+            .map(|acc| acc.balance)
+            .unwrap_or(0)
     }
 
     /// Retrieves an account by address (mutable reference), creating it if it doesn't exist.
@@ -141,6 +128,36 @@ impl State {
         })
     }
 
+    /// Transfers native balance between accounts. Returns false on insufficient funds or overflow.
+    pub fn transfer(&mut self, from: &Address, to: &Address, value: u64) -> bool {
+        let amount = value as u128;
+        let from_balance = match self.get_account(from) {
+            Some(account) => account.balance,
+            None => return false,
+        };
+        if from_balance < amount {
+            return false;
+        }
+        if from == to {
+            return true;
+        }
+        let to_balance = self.balance_of(to);
+        let new_to_balance = match to_balance.checked_add(amount) {
+            Some(balance) => balance,
+            None => return false,
+        };
+
+        {
+            let from_account = self.get_account_mut(from);
+            from_account.balance = from_balance - amount;
+        }
+        {
+            let to_account = self.get_account_mut(to);
+            to_account.balance = new_to_balance;
+        }
+        true
+    }
+
     /// Checks if an address corresponds to a contract account.
     /// 
     /// EDUCATIONAL PURPOSE: This demonstrates how to distinguish between
@@ -162,27 +179,72 @@ impl State {
 
     /// Encode state into a byte buffer for guest consumption.
     pub fn encode(&self) -> alloc::vec::Vec<u8> {
-        let mut out = alloc::vec::Vec::new();
-        out.extend_from_slice(&(self.accounts.len() as u32).to_le_bytes());
+        let len = self.encoded_len();
+        let mut out = alloc::vec![0u8; len];
+        let _ = self.encode_into(&mut out);
+        out
+    }
+
+    /// Returns the byte length of the encoded state.
+    pub fn encoded_len(&self) -> usize {
+        let mut total = 4usize; // account count
+        for (addr, acc) in &self.accounts {
+            let mut acc_len = 0usize;
+            acc_len = acc_len.saturating_add(addr.0.len());
+            acc_len = acc_len.saturating_add(16); // balance
+            acc_len = acc_len.saturating_add(8); // nonce
+            acc_len = acc_len.saturating_add(1); // is_contract
+            acc_len = acc_len.saturating_add(4); // code len
+            acc_len = acc_len.saturating_add(acc.code.len());
+            acc_len = acc_len.saturating_add(4); // storage len
+            for (k, v) in &acc.storage {
+                acc_len = acc_len.saturating_add(4); // key len
+                acc_len = acc_len.saturating_add(k.as_bytes().len());
+                acc_len = acc_len.saturating_add(4); // val len
+                acc_len = acc_len.saturating_add(v.len());
+            }
+            total = total.saturating_add(acc_len);
+        }
+        total
+    }
+
+    /// Encode state into a provided buffer. Returns bytes written on success.
+    pub fn encode_into(&self, out: &mut [u8]) -> Option<usize> {
+        let mut cursor = 0usize;
+        let write = |buf: &mut [u8], cursor: &mut usize, bytes: &[u8]| -> Option<()> {
+            if *cursor + bytes.len() > buf.len() {
+                return None;
+            }
+            buf[*cursor..*cursor + bytes.len()].copy_from_slice(bytes);
+            *cursor += bytes.len();
+            Some(())
+        };
+
+        let count = self.accounts.len() as u32;
+        write(out, &mut cursor, &count.to_le_bytes())?;
 
         for (addr, acc) in &self.accounts {
-            out.extend_from_slice(&addr.0);
-            out.extend_from_slice(&acc.balance.to_le_bytes());
-            out.extend_from_slice(&acc.nonce.to_le_bytes());
-            out.push(acc.is_contract as u8);
-            out.extend_from_slice(&(acc.code.len() as u32).to_le_bytes());
-            out.extend_from_slice(&acc.code);
+            write(out, &mut cursor, &addr.0)?;
+            write(out, &mut cursor, &acc.balance.to_le_bytes())?;
+            write(out, &mut cursor, &acc.nonce.to_le_bytes())?;
+            write(out, &mut cursor, &[acc.is_contract as u8])?;
+            let code_len = acc.code.len() as u32;
+            write(out, &mut cursor, &code_len.to_le_bytes())?;
+            write(out, &mut cursor, &acc.code)?;
 
-            out.extend_from_slice(&(acc.storage.len() as u32).to_le_bytes());
+            let storage_len = acc.storage.len() as u32;
+            write(out, &mut cursor, &storage_len.to_le_bytes())?;
             for (k, v) in &acc.storage {
-                out.extend_from_slice(&(k.len() as u32).to_le_bytes());
-                out.extend_from_slice(k.as_bytes());
-                out.extend_from_slice(&(v.len() as u32).to_le_bytes());
-                out.extend_from_slice(v);
+                let key_len = k.as_bytes().len() as u32;
+                write(out, &mut cursor, &key_len.to_le_bytes())?;
+                write(out, &mut cursor, k.as_bytes())?;
+                let val_len = v.len() as u32;
+                write(out, &mut cursor, &val_len.to_le_bytes())?;
+                write(out, &mut cursor, v)?;
             }
         }
 
-        out
+        Some(cursor)
     }
 
     /// Decode state produced by `encode`.
@@ -272,137 +334,4 @@ impl State {
         Some(Self { accounts })
     }
 
-    /// Deploys a contract to a specific address.
-    /// 
-    /// EDUCATIONAL PURPOSE: This demonstrates smart contract deployment.
-    /// When a contract is deployed, it creates or updates an account with
-    /// the contract's bytecode and marks it as a contract account.
-    /// 
-    /// DEPLOYMENT PROCESS:
-    /// 1. Get or create the account at the specified address
-    /// 2. Set the account's code to the provided bytecode
-    /// 3. Mark the account as a contract
-    /// 
-    /// SECURITY: In real systems, contract deployment would include
-    /// additional checks like code validation, gas limits, etc.
-    /// 
-    /// PARAMETERS:
-    /// - addr: The address where the contract should be deployed
-    /// - code: The bytecode of the contract to deploy
-    pub fn deploy_contract(&mut self, addr: Address, code: Vec<u8>) {
-        // EDUCATIONAL: Get or create the account at the specified address
-        let acc = self.accounts.entry(addr).or_insert_with(|| Account {
-            nonce: 0,                    // No transactions yet
-            balance: 0,                  // No initial balance
-            code: Vec::new(),            // No code initially
-            is_contract: false,          // Not a contract initially
-            storage: BTreeMap::new(),    // Empty storage
-        });
-        
-        // EDUCATIONAL: Set the contract code and mark as contract
-        acc.code = code;                 // Deploy the bytecode
-        acc.is_contract = true;          // Mark as contract account
-    }
-
-    /// Prints a human-readable representation of the current state.
-    /// 
-    /// EDUCATIONAL PURPOSE: This demonstrates state inspection and debugging.
-    /// Being able to visualize the blockchain state is crucial for development,
-    /// testing, and understanding how transactions affect the system.
-    /// 
-    /// OUTPUT FORMAT: Shows each account with its:
-    /// - Address (in hexadecimal)
-    /// - Balance
-    /// - Nonce (transaction count)
-    /// - Contract status
-    /// - Code size
-    /// - Storage contents
-    /// 
-    /// USAGE: Useful for debugging, testing, and educational demonstrations.
-    #[cfg(feature = "std")]
-    pub fn pretty_print(&self) {
-        println!("--- State Dump ---");
-        for (addr, acc) in &self.accounts {
-            // EDUCATIONAL: Display account address in hexadecimal format
-            println!("  🔑 Address: 0x{}", hex_encode(addr.0));
-            
-            // EDUCATIONAL: Display account metadata
-            println!("      - Balance: {}", acc.balance);
-            println!("      - Nonce: {}", acc.nonce);
-            println!("      - Is contract?: {}", acc.is_contract);
-            println!("      - Code size: {} bytes", acc.code.len());
-            
-            // EDUCATIONAL: Display storage contents
-            println!("      - Storage:");
-            for (key, value) in &acc.storage {
-                // EDUCATIONAL: Convert storage values to hexadecimal for readability
-                let value_hex: Vec<String> = value.iter().map(|b| format!("{:02x}", b)).collect();
-                
-                // Parse the key as "domain:key" format
-                if let Some((domain, key_part)) = Self::parse_domain_key(key) {
-                    if domain == "P" {
-                        // For persistent storage, treat key as ASCII
-                        if let Ok(ascii_key) = String::from_utf8(hex::decode(&key_part).unwrap_or_default()) {
-                            println!("          Key: {}:{} | Value ({} bytes): {}", domain, ascii_key, value.len(), value_hex.join(" "));
-                        } else {
-                            println!("          Key: {}:{} | Value ({} bytes): {}", domain, key_part, value.len(), value_hex.join(" "));
-                        }
-                    } else {
-                        // For storage maps, treat domain as ASCII and key as hex
-                        println!("          Key: {}:{} | Value ({} bytes): {}", domain, key_part, value.len(), value_hex.join(" "));
-                    }
-                } else {
-                    // Fall back to showing the raw key
-                    println!("          Key: {:<20} | Value ({} bytes): {}", key, value.len(), value_hex.join(" "));
-                }
-            }
-            println!();
-        }
-        println!("--------------------");
-    }
-    
-    /// Parses a storage key in "domain:key" format to extract domain and key components.
-    /// 
-    /// Storage keys are formatted as: "domain:key"
-    /// where domain is like "P" or "Balances" and key is hex-encoded
-    #[cfg(feature = "std")]
-    fn parse_domain_key(key: &str) -> Option<(String, String)> {
-        // Find the first colon to separate domain and key
-        if let Some(colon_pos) = key.find(':') {
-            let domain = key[..colon_pos].to_string();
-            let key_part = key[colon_pos + 1..].to_string();
-            return Some((domain, key_part));
-        }
-        
-        None
-    }
-    
-    /// Parses a storage map key to extract address and domain components.
-    /// 
-    /// Storage map keys are formatted as: [address_bytes][domain]
-    /// where address_bytes is 20 bytes and domain is like "-Balances"
-    fn parse_storage_map_key(key: &str) -> Option<(String, String)> {
-        // Check if the key is long enough to contain an address (20 bytes = 40 hex chars)
-        if key.len() < 40 {
-            return None;
-        }
-        
-        // Try to parse the first 40 characters as a hex address
-        if let Ok(address_bytes) = hex::decode(&key[..40]) {
-            if address_bytes.len() == 20 {
-                // Convert to proper address format
-                let address = format!("0x{}", &key[..40]);
-                
-                // Parse the domain (remaining hex characters)
-                let domain_hex = &key[40..];
-                if let Ok(domain_bytes) = hex::decode(domain_hex) {
-                    if let Ok(domain_str) = String::from_utf8(domain_bytes) {
-                        return Some((address, domain_str));
-                    }
-                }
-            }
-        }
-        
-        None
-    }
 }

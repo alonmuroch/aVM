@@ -10,6 +10,7 @@ use core::cell::RefCell;
 use core::fmt::Write;
 use bootloader::bootloader::Bootloader;
 use state::State;
+use crate::state_helper::test_state;
 
 // File writer for logging to disk
 struct FileWriter {
@@ -119,7 +120,7 @@ impl TestRunner {
     /// Run a single test case
     fn run_test_case(&self, case: &super::TestCase) -> Result<(), String> {
         let mut bootloader = Bootloader::new(self.vm_memory_size);
-        let state = Rc::new(RefCell::new(State::new()));
+        let state = Rc::new(RefCell::new(test_state()));
 
         // Write test case header
         writeln!(
@@ -149,7 +150,7 @@ impl TestRunner {
         writeln!(self.writer.borrow_mut()).unwrap();
 
         // Execute the whole bundle via the bootloader/kernel path.
-        let receipts = bootloader.execute_bundle(
+        let result = bootloader.execute_bundle(
             self.kernel_bytes.as_ref().ok_or_else(|| {
                 "KERNEL_ELF not set or unreadable; bootloader path required".to_string()
             })?,
@@ -163,14 +164,19 @@ impl TestRunner {
             },
         );
 
-        let receipts = match receipts {
-            Some(receipts) => receipts,
+        let result = match result {
+            Some(result) => result,
             None => {
                 return Err("Bootloader returned no receipts".to_string());
             }
         };
+        if let Some(post_state) = result.state {
+            println!("\n=== State After Execution ===");
+            print_state(&post_state);
+        }
 
-        let receipt = receipts
+        let receipt = result
+            .receipts
             .last()
             .ok_or_else(|| "No receipts returned from kernel".to_string())?;
         writeln!(self.writer.borrow_mut(), "\n=== Receipt ===").unwrap();
@@ -229,6 +235,52 @@ impl TestRunner {
         // For now we treat successful bootloader execution as a passed test.
         Ok(())
     }
+}
+
+fn print_state(state: &State) {
+    println!("--- State Dump ---");
+    for (addr, acc) in &state.accounts {
+        println!("  Address: 0x{}", hex_encode(addr.0));
+        println!("      - Balance: {}", acc.balance);
+        println!("      - Nonce: {}", acc.nonce);
+        println!("      - Is contract?: {}", acc.is_contract);
+        println!("      - Code size: {} bytes", acc.code.len());
+        println!("      - Storage:");
+        for (key, value) in &acc.storage {
+            let value_hex = hex_join(value);
+            println!(
+                "          Key: {:<20} | Value ({} bytes): {}",
+                key,
+                value.len(),
+                value_hex
+            );
+        }
+        println!();
+    }
+    println!("--------------------");
+}
+
+fn hex_encode(bytes: [u8; 20]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(40);
+    for b in bytes {
+        out.push(HEX[(b >> 4) as usize] as char);
+        out.push(HEX[(b & 0x0f) as usize] as char);
+    }
+    out
+}
+
+fn hex_join(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len().saturating_mul(3));
+    for (idx, b) in bytes.iter().enumerate() {
+        if idx > 0 {
+            out.push(' ');
+        }
+        out.push(HEX[(b >> 4) as usize] as char);
+        out.push(HEX[(b & 0x0f) as usize] as char);
+    }
+    out
 }
 
 impl Default for TestRunner {
