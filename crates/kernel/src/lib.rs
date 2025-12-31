@@ -18,6 +18,7 @@ pub use task::{
 pub mod memory;
 pub mod trap;
 pub mod syscall;
+pub mod user_program;
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {

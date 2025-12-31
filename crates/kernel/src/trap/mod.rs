@@ -5,6 +5,7 @@ use types::result::{Result as VmResult, RESULT_DATA_SIZE};
 use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, LAST_COMPLETED_TASK, TASKS};
 use crate::memory::page_allocator as mmu;
 use crate::syscall;
+use crate::syscall::alloc::alloc_in_task;
 use crate::syscall::storage::read_user_bytes;
 use crate::task::TRAMPOLINE_VA;
 use crate::{Config, Task};
@@ -137,7 +138,10 @@ pub extern "C" fn handle_trap(saved: *mut u32) -> (u32, u32) {
             } else {
                 syscall::CallerMode::User
             };
-            let ret = syscall::dispatch_syscall(call_id, args, caller_mode);
+            let ret = {
+                let mut ctx = syscall::SyscallContext { regs, caller_mode };
+                syscall::dispatch_syscall(call_id, args, &mut ctx)
+            };
             regs[REG_A0] = ret; // a0 return value
             regs[REG_PC] = regs[REG_PC].wrapping_add(4); // Advance past ecall
             return_kind = 0;
@@ -146,6 +150,7 @@ pub extern "C" fn handle_trap(saved: *mut u32) -> (u32, u32) {
         SCAUSE_BREAKPOINT => {
             // Default to returning to the kernel task unless the current task has a caller.
             let mut caller_idx = KERNEL_TASK_SLOT;
+            let mut result_for_caller: Option<VmResult> = None;
             unsafe {
                 let current = *CURRENT_TASK.get_mut();
                 let tasks = TASKS.get_mut();
@@ -155,6 +160,7 @@ pub extern "C" fn handle_trap(saved: *mut u32) -> (u32, u32) {
                         if let Some(result) = read_task_result(task) {
                             task.last_result = Some(result);
                             log_task_result(&result);
+                            result_for_caller = Some(result);
                         } else {
                             log!("program result: failed to read result bytes");
                         }
@@ -172,12 +178,23 @@ pub extern "C" fn handle_trap(saved: *mut u32) -> (u32, u32) {
                     }
                 }
                 // Restore the caller task's trapframe and address-space root.
-                if let Some(caller_task) = tasks.get(caller_idx) {
+                if let Some(caller_task) = tasks.get_mut(caller_idx) {
+                    if caller_idx != KERNEL_TASK_SLOT {
+                        let result_ptr = match result_for_caller {
+                            Some(result) => write_result_to_caller(caller_task, &result).unwrap_or(0),
+                            None => 0,
+                        };
+                        caller_task.tf.regs[REG_A0] = result_ptr;
+                    }
                     for (idx, value) in caller_task.tf.regs.iter().take(REG_COUNT).enumerate() {
                         regs[idx] = *value;
                     }
                     // Resume at the caller's return address.
-                    regs[REG_PC] = caller_task.tf.regs[REG_RA];
+                    regs[REG_PC] = if caller_idx == KERNEL_TASK_SLOT {
+                        caller_task.tf.regs[REG_RA]
+                    } else {
+                        caller_task.tf.pc
+                    };
                     mmu::set_current_root(caller_task.addr_space.root_ppn);
                     return_sp = caller_task.tf.regs[REG_SP];
                     logf!(
@@ -266,6 +283,22 @@ fn log_task_result(result: &VmResult) {
     if data_len > 0 {
         log!("program result data: %b", &result.data[..data_len]);
     }
+}
+
+fn write_result_to_caller(caller_task: &mut Task, result: &VmResult) -> Option<u32> {
+    let addr = alloc_in_task(caller_task, Config::MAX_RESULT_SIZE as u32, 4)?;
+    let mut buf = [0u8; Config::MAX_RESULT_SIZE];
+    buf[0] = result.success as u8;
+    buf[1..5].copy_from_slice(&result.error_code.to_le_bytes());
+    buf[5..9].copy_from_slice(&result.data_len.to_le_bytes());
+    let data_len = (result.data_len as usize).min(RESULT_DATA_SIZE);
+    if data_len > 0 {
+        buf[9..9 + data_len].copy_from_slice(&result.data[..data_len]);
+    }
+    if !mmu::copy_into_user(caller_task.addr_space.root_ppn, addr, &buf) {
+        return None;
+    }
+    Some(addr)
 }
 
 #[inline(always)]

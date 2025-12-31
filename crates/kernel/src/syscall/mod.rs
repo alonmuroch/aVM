@@ -4,11 +4,13 @@
 use program::{log, logf};
 
 pub mod alloc;
+pub mod call_program;
 pub mod fire_event;
 pub mod panic;
 pub mod storage;
 
 use alloc::{sys_alloc, sys_dealloc};
+use call_program::sys_call_program;
 use fire_event::sys_fire_event;
 use panic::sys_panic;
 use storage::{sys_storage_get, sys_storage_set};
@@ -32,13 +34,18 @@ pub enum CallerMode {
     Supervisor,
 }
 
-pub fn dispatch_syscall(call_id: u32, args: [u32; 6], caller_mode: CallerMode) -> u32 {
+pub struct SyscallContext<'a> {
+    pub regs: &'a mut [u32],
+    pub caller_mode: CallerMode,
+}
+
+pub fn dispatch_syscall(call_id: u32, args: [u32; 6], ctx: &mut SyscallContext<'_>) -> u32 {
     match call_id {
         SYSCALL_STORAGE_GET => sys_storage_get(args),
         SYSCALL_STORAGE_SET => sys_storage_set(args),
         SYSCALL_PANIC => sys_panic(args),
-        SYSCALL_LOG => sys_log(args, caller_mode),
-        SYSCALL_CALL_PROGRAM => sys_call_program(args),
+        SYSCALL_LOG => sys_log(args, ctx.caller_mode),
+        SYSCALL_CALL_PROGRAM => sys_call_program(args, ctx),
         SYSCALL_FIRE_EVENT => sys_fire_event(args),
         SYSCALL_ALLOC => sys_alloc(args),
         SYSCALL_DEALLOC => sys_dealloc(args),
@@ -58,11 +65,6 @@ fn sys_log(_args: [u32; 6], caller_mode: CallerMode) -> u32 {
     } else {
         log!("guest: sys_log: need implementation");
     }
-    0
-}
-
-fn sys_call_program(_args: [u32; 6]) -> u32 {
-    log!("sys_call_program: need implementation");
     0
 }
 

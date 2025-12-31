@@ -209,7 +209,7 @@ pub(crate) fn read_user_bytes(root_ppn: u32, ptr: u32, len: usize) -> Option<Vec
     Some(buf)
 }
 
-fn caller_address_matches(root_ppn: u32, address: &Address) -> bool {
+pub(crate) fn caller_address_matches(root_ppn: u32, address: &Address) -> bool {
     let current = unsafe { *CURRENT_TASK.get_mut() };
     if current == KERNEL_TASK_SLOT {
         return true;

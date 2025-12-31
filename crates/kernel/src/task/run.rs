@@ -141,6 +141,7 @@ pub unsafe extern "C" fn kernel_run_task(task_idx: usize) -> ! {
     );
 }
 
+/// Save the kernel trapframe into TASKS[0] and then jump into the requested task.
 extern "C" fn kernel_run_task_inner(saved: *const u32, task_idx: usize) -> ! {
     // Interpret the saved trap-frame as regs[0..31] + pc and copy it into TASKS[0].
     let regs = unsafe { core::slice::from_raw_parts(saved, TRAP_FRAME_WORDS) };

@@ -1,5 +1,5 @@
 use crate::{AddressSpace, Config, Task};
-use crate::global::CURRENT_TASK;
+use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, TASKS};
 use crate::memory::page_allocator as mmu;
 use program::{log, logf};
 use types::address::Address;
@@ -151,17 +151,13 @@ pub fn prep_program_task(
     // Install a small trampoline page mapped in both roots so we can switch
     // satp safely before jumping into the user program.
     let tramp_perms = mmu::PagePerms::user_rwx();
-    if !mmu::map_user_range_for_root(root_ppn, TRAMPOLINE_VA, PAGE_SIZE, tramp_perms) {
-        panic!("prep_program_task: failed to map trampoline page in user root");
-    }
-    let _tramp_phys = match mmu::translate_user_va(root_ppn, TRAMPOLINE_VA) {
-        Some(p) => p as u32,
-        None => panic!("prep_program_task: trampoline VA not mapped"),
+    let kernel_root = unsafe {
+        TASKS
+            .get_mut()
+            .get(KERNEL_TASK_SLOT)
+            .map(|task| task.addr_space.root_ppn)
+            .unwrap_or_else(mmu::current_root)
     };
-    if !mmu::mirror_user_range_into_kernel(root_ppn, TRAMPOLINE_VA, PAGE_SIZE, tramp_perms) {
-        panic!("prep_program_task: failed to mirror trampoline into kernel root");
-    }
-    let kernel_root = mmu::current_root();
     let trap_entry = crate::trap::trap_entry as usize as u32;
     let trap_trampoline = build_trap_trampoline(kernel_root, trap_entry);
     // Stash both trampolines in a single shared page.
@@ -175,8 +171,24 @@ pub fn prep_program_task(
         let base = TRAP_TRAMPOLINE_OFFSET + i * 4;
         tramp_bytes[base..base + 4].copy_from_slice(&word.to_le_bytes());
     }
-    if !mmu::copy_into_user(root_ppn, TRAMPOLINE_VA, &tramp_bytes) {
+    if !mmu::map_user_range_for_root(kernel_root, TRAMPOLINE_VA, PAGE_SIZE, tramp_perms) {
+        panic!("prep_program_task: failed to map trampoline page in kernel root");
+    }
+    if !mmu::copy_into_user(kernel_root, TRAMPOLINE_VA, &tramp_bytes) {
         panic!("prep_program_task: failed to populate trampoline code");
+    }
+    let tramp_phys = match mmu::translate_user_va(kernel_root, TRAMPOLINE_VA) {
+        Some(p) => p as u32,
+        None => panic!("prep_program_task: trampoline VA not mapped in kernel root"),
+    };
+    if !mmu::map_physical_range_for_root(
+        root_ppn,
+        TRAMPOLINE_VA,
+        tramp_phys,
+        PAGE_SIZE,
+        tramp_perms,
+    ) {
+        panic!("prep_program_task: failed to map trampoline page in user root");
     }
 
     let mut task = Task::new(
