@@ -442,7 +442,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
                     data: encode_router_calls(&[HostFuncCall {
-                        selector: 0x02, // transfer
+                        selector: 0x03, // approve
                         args: (|| {
                             let mut args = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d5")
                                 .0

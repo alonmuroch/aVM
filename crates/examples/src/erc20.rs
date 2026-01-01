@@ -3,10 +3,8 @@
 
 extern crate clibc;
 use clibc::{
-    DataParser, Map, entrypoint, event, fire_event, log, logf, persist_struct, require,
-    router::route,
-    types::{address::Address, o::O, result::Result},
-    vm_panic,
+    DataParser, Map, StorageKey, entrypoint, event, fire_event, log, logf, persist_struct,
+    require, router::route, types::{address::Address, o::O, result::Result}, vm_panic,
 };
 
 // Persistent structs
@@ -27,6 +25,26 @@ event!(Transfer {
 });
 
 Map!(Balances);
+Map!(Allowances);
+
+struct AllowanceKey {
+    bytes: [u8; 40],
+}
+
+impl AllowanceKey {
+    fn new(owner: Address, spender: Address) -> Self {
+        let mut bytes = [0u8; 40];
+        bytes[..20].copy_from_slice(&owner.0);
+        bytes[20..].copy_from_slice(&spender.0);
+        Self { bytes }
+    }
+}
+
+impl StorageKey for AllowanceKey {
+    fn as_storage_key(&self) -> &[u8] {
+        &self.bytes
+    }
+}
 
 unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
     route(data, program, caller, |to, from, call| {
@@ -40,6 +58,21 @@ unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
                 let to = parser.read_address();
                 let amount = parser.read_u32();
                 transfer(&program, caller, to, amount);
+                Result::new(true, 0)
+            }
+            0x03 => {
+                let mut parser = DataParser::new(call.args);
+                let spender = parser.read_address();
+                let amount = parser.read_u32();
+                approve(&program, caller, spender, amount);
+                Result::new(true, 0)
+            }
+            0x04 => {
+                let mut parser = DataParser::new(call.args);
+                let from = parser.read_address();
+                let to = parser.read_address();
+                let amount = parser.read_u32();
+                transfer_from(&program, caller, from, to, amount);
                 Result::new(true, 0)
             }
             0x05 => {
@@ -106,6 +139,44 @@ fn transfer(program: &Address, caller: Address, to: Address, amount: u32) {
     Balances::set(program, to, to_bal + amount);
 
     fire_event!(Transfer::new(caller, to, amount));
+}
+
+fn approve(program: &Address, caller: Address, spender: Address, amount: u32) {
+    let key = AllowanceKey::new(caller, spender);
+    Allowances::set(program, key, amount);
+}
+
+fn transfer_from(
+    program: &Address,
+    caller: Address,
+    from: Address,
+    to: Address,
+    amount: u32,
+) {
+    let allowance = match Allowances::get(program, AllowanceKey::new(from, caller)) {
+        O::Some(val) => val,
+        O::None => 0,
+    };
+    require(allowance >= amount, b"allowance insufficient");
+
+    let from_bal = match Balances::get(program, from) {
+        O::Some(bal) => bal,
+        O::None => 0,
+    };
+    if from_bal < amount {
+        vm_panic(b"insufficient");
+    }
+
+    let to_bal = match Balances::get(program, to) {
+        O::Some(bal) => bal,
+        O::None => 0,
+    };
+
+    Allowances::set(program, AllowanceKey::new(from, caller), allowance - amount);
+    Balances::set(program, from, from_bal - amount);
+    Balances::set(program, to, to_bal + amount);
+
+    fire_event!(Transfer::new(from, to, amount));
 }
 
 fn balance_of(program: &Address, owner: Address) -> u32 {

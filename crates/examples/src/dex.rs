@@ -86,7 +86,7 @@ fn add_liquidity(program: Address, caller: Address, mut parser: DataParser) -> R
 
     // Pull ERC20 from caller into the pool address.
     let ok = erc20
-        .transfer(&caller, program, token_in as u32)
+        .transfer_from(&program, caller, program, token_in as u32)
         .map(|r| r.success)
         .unwrap_or(false);
     require(ok, b"add: token transfer failed");
@@ -225,7 +225,7 @@ fn swap(program: Address, caller: Address, mut parser: DataParser) -> Result {
 
         // Pull ERC20 into the pool.
         let ok = erc20
-            .transfer(&caller, program, token_in as u32)
+            .transfer_from(&program, caller, program, token_in as u32)
             .map(|r| r.success)
             .unwrap_or(false);
         require(ok, b"swap: token transfer failed");

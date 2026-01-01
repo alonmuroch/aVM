@@ -76,6 +76,8 @@ fn test_function_extraction() {
     let function_names: Vec<&str> = abi.functions.iter().map(|f| f.name.as_str()).collect();
     assert!(function_names.contains(&"init"));
     assert!(function_names.contains(&"transfer"));
+    assert!(function_names.contains(&"approve"));
+    assert!(function_names.contains(&"transfer_from"));
     assert!(function_names.contains(&"balance_of"));
     
     // Check selectors
@@ -838,6 +840,24 @@ fn test_erc20_example_file_generates_typed_abi() {
     assert!(matches!(transfer_func.inputs[0].kind, ParamType::Address));
     assert_eq!(transfer_func.inputs[1].name, "amount");
     assert!(matches!(transfer_func.inputs[1].kind, ParamType::Uint(32)));
+
+    let approve_func = abi.functions.iter().find(|f| f.name == "approve").unwrap();
+    assert_eq!(approve_func.selector, 3);
+    assert_eq!(approve_func.inputs.len(), 2);
+    assert_eq!(approve_func.inputs[0].name, "spender");
+    assert!(matches!(approve_func.inputs[0].kind, ParamType::Address));
+    assert_eq!(approve_func.inputs[1].name, "amount");
+    assert!(matches!(approve_func.inputs[1].kind, ParamType::Uint(32)));
+
+    let transfer_from = abi.functions.iter().find(|f| f.name == "transfer_from").unwrap();
+    assert_eq!(transfer_from.selector, 4);
+    assert_eq!(transfer_from.inputs.len(), 3);
+    assert_eq!(transfer_from.inputs[0].name, "from");
+    assert!(matches!(transfer_from.inputs[0].kind, ParamType::Address));
+    assert_eq!(transfer_from.inputs[1].name, "to");
+    assert!(matches!(transfer_from.inputs[1].kind, ParamType::Address));
+    assert_eq!(transfer_from.inputs[2].name, "amount");
+    assert!(matches!(transfer_from.inputs[2].kind, ParamType::Uint(32)));
 
     let balance_func = abi.functions.iter().find(|f| f.name == "balance_of").unwrap();
     assert_eq!(balance_func.selector, 5);
