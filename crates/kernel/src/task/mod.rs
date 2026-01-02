@@ -7,8 +7,8 @@
 // - Map a fixed, contiguous user window starting at VA 0x0 that holds:
 //     * Code/rodata (program bytes copied starting at VA 0x0; entry at `entry_off`)
 //     * A user stack (STACK_BYTES)
-//     * A user heap (HEAP_BYTES) with input placed at INPUT_BASE_ADDR
-// - Copy call arguments (to/from addresses + input buffer) into that window.
+//     * A user heap (HEAP_BYTES) with call args in a dedicated page at INPUT_BASE_ADDR
+// - Copy call arguments (to/from addresses + input buffer) into that call-args page.
 // - Prepare a trapframe with PC/SP/args and transfer control to user code.
 //
 // Key pieces:
@@ -21,7 +21,7 @@
 //   This keeps trap entry valid even when the current root is the user page table.
 //
 // prep_program_task(to, from, code, input, entry_off):
-// 1) Allocate ASID and a fresh root PPN; map the user window with user_rwx perms.
+// 1) Allocate ASID and a fresh root PPN; map the user window + call-args page.
 // 2) Copy program code starting at VA 0 (so section offsets are preserved), copy args (to/from/input).
 // 3) Map the trampoline page into the user root and mirror the same physical page
 //    into the current kernel root; write trampoline code into it.
@@ -48,7 +48,7 @@
 // - We currently do not touch sstatus/mstatus or perform sfence.vma; add those
 //   when modeling fuller privilege transitions.
 
-use crate::global::{CODE_SIZE_LIMIT, NEXT_ASID, RO_DATA_SIZE_LIMIT};
+use crate::global::NEXT_ASID;
 
 pub mod task;
 pub mod prep;
@@ -60,9 +60,8 @@ pub use prep::prep_program_task;
 pub use run::{kernel_run_task, run_task};
 
 const PAGE_SIZE: usize = 4096;
-const STACK_BYTES: usize = 0x4000; // 16 KiB user stack
-pub const HEAP_BYTES: usize = 0x8000; // 32 KiB user heap
-pub const PROGRAM_VA_BASE: u32 = 0x0;
+const STACK_BYTES: usize = crate::global::STACK_BYTES;
+pub const HEAP_BYTES: usize = crate::global::HEAP_BYTES;
 // Location of the page that hosts the satp-switch trampolines. Kept just past
 // the user window so it does not collide with program text/stack/heap. This VA
 // is mapped into both roots so satp can be switched without invalidating the
@@ -72,15 +71,7 @@ pub const TRAMPOLINE_VA: u32 =
 const TRAP_TRAMPOLINE_OFFSET: usize = 0x10; // Offset for the trap-entry stub within the page.
 pub const TRAP_TRAMPOLINE_VA: u32 =
     TRAMPOLINE_VA + TRAP_TRAMPOLINE_OFFSET as u32; // stvec target for user-mode traps.
-const fn align_up(val: usize, align: usize) -> usize {
-    (val + (align - 1)) & !(align - 1)
-}
-
-/// Total mapped window for a program: code/rodata, stack, and heap.
-pub const PROGRAM_WINDOW_BYTES: usize = align_up(
-    CODE_SIZE_LIMIT + RO_DATA_SIZE_LIMIT + STACK_BYTES + HEAP_BYTES,
-    PAGE_SIZE,
-);
+pub use crate::global::{PROGRAM_VA_BASE, PROGRAM_WINDOW_BYTES};
 
 const REG_SP: usize = 2;
 const REG_RA: usize = 1;

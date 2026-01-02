@@ -20,7 +20,7 @@ pub(crate) fn sys_storage_get(args: [u32; 6]) -> u32 {
     let domain_len = lens_packed & 0xffff;
     let key_len = lens_packed >> 16;
 
-    let root_ppn = match current_root_ppn() {
+    let root_ppn = match current_task_root_ppn() {
         Some(root) => root,
         None => return 0,
     };
@@ -111,7 +111,7 @@ pub(crate) fn sys_storage_set(args: [u32; 6]) -> u32 {
     let domain_len = lens_packed & 0xffff;
     let key_len = lens_packed >> 16;
 
-    let root_ppn = match current_root_ppn() {
+    let root_ppn = match current_task_root_ppn() {
         Some(root) => root,
         None => return 0,
     };
@@ -164,7 +164,7 @@ pub(crate) fn sys_storage_set(args: [u32; 6]) -> u32 {
     0
 }
 
-pub(crate) fn current_root_ppn() -> Option<u32> {
+pub(crate) fn current_task_root_ppn() -> Option<u32> {
     let current = unsafe { *CURRENT_TASK.get_mut() };
     let tasks = unsafe { TASKS.get_mut() };
     match tasks.get(current) {

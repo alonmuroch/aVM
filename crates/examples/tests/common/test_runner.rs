@@ -83,7 +83,7 @@ impl TestRunner {
         TestRunner {
             writer,
             verbose: false,
-            vm_memory_size: 4 * 1024 * 1024, // larger default to accommodate bigger binaries without RVC
+            vm_memory_size: 16 * 1024 * 1024, // larger default to accommodate bigger binaries without RVC
             kernel_bytes: Self::load_kernel_from_env(),
             kernel_path: env::var("KERNEL_ELF").ok(),
         }

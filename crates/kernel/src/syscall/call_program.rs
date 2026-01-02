@@ -2,7 +2,7 @@ use clibc::logf;
 use types::{Address, ADDRESS_LEN};
 
 use crate::global::{CURRENT_TASK, MAX_INPUT_LEN, TASKS};
-use crate::syscall::storage::{caller_address_matches, current_root_ppn, read_user_bytes};
+use crate::syscall::storage::{caller_address_matches, current_task_root_ppn, read_user_bytes};
 use crate::syscall::SyscallContext;
 use crate::task::prep_program_task;
 use crate::user_program::with_program_image;
@@ -21,7 +21,7 @@ pub(crate) fn sys_call_program(args: [u32; 6], ctx: &mut SyscallContext<'_>) -> 
         return 0;
     }
 
-    let root_ppn = match current_root_ppn() {
+    let root_ppn = match current_task_root_ppn() {
         Some(root) => root,
         None => return 0,
     };

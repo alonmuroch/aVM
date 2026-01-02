@@ -13,7 +13,7 @@ use vm::memory::{API, Perms, Sv32Memory, HEAP_PTR_OFFSET, Memory as MmuRef, Virt
 use vm::registers::Register;
 use vm::vm::VM;
 
-const KERNEL_WINDOW_BYTES: usize = 256 * 1024;
+const KERNEL_WINDOW_BYTES: usize = 4 * 1024 * 1024;
 const KERNEL_STACK_TOP: u32 = KERNEL_WINDOW_BYTES as u32;
 
 /// Boot configuration options consumed by the loader.

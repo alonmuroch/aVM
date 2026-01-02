@@ -1,11 +1,12 @@
 use crate::{AddressSpace, Task};
 use crate::global::{
-    CODE_SIZE_LIMIT, CURRENT_TASK, FROM_PTR_ADDR, HEAP_START_ADDR, INPUT_BASE_ADDR, MAX_INPUT_LEN,
-    RO_DATA_SIZE_LIMIT, TO_PTR_ADDR,
+    CALL_ARGS_PAGE_BASE, CODE_SIZE_LIMIT, CURRENT_TASK, FROM_PTR_ADDR, HEAP_START_ADDR,
+    INPUT_BASE_ADDR, MAX_INPUT_LEN, RO_DATA_SIZE_LIMIT, TO_PTR_ADDR,
 };
 use crate::memory::page_allocator as mmu;
 use clibc::{log, logf};
 use types::address::Address;
+use types::SV32_PAGE_SIZE;
 
 use super::{
     alloc_asid, trampoline::map_trampoline_page, PROGRAM_VA_BASE, PROGRAM_WINDOW_BYTES, REG_A0,
@@ -49,6 +50,13 @@ pub fn prep_program_task(
         PROGRAM_VA_BASE,
         window_end
     );
+    let args_perms = mmu::PagePerms::new(true, false, false, true);
+    if !mmu::map_range_for_root(root_ppn, CALL_ARGS_PAGE_BASE, SV32_PAGE_SIZE, args_perms) {
+        panic!(
+            "launch_program: failed to map call-args page (root=0x{:x})",
+            root_ppn
+        );
+    }
     let perms = mmu::PagePerms::user_rwx();
     if !mmu::map_range_for_root(root_ppn, PROGRAM_VA_BASE, PROGRAM_WINDOW_BYTES, perms) {
         panic!("launch_program: mapping failed (root=0x{:x})", root_ppn);
@@ -121,8 +129,7 @@ pub fn prep_program_task(
     let caller = unsafe { *CURRENT_TASK.get_mut() };
     task.caller_task_id = Some(caller);
     // Set up initial trapframe.
-    let stack_top = PROGRAM_VA_BASE
-        .wrapping_add((CODE_SIZE_LIMIT + RO_DATA_SIZE_LIMIT + STACK_BYTES) as u32);
+    let stack_top = PROGRAM_VA_BASE.wrapping_add(PROGRAM_WINDOW_BYTES as u32);
     task.tf.pc = entry_va;
     task.tf.regs[REG_SP] = stack_top;
     task.tf.regs[REG_A0] = TO_PTR_ADDR;

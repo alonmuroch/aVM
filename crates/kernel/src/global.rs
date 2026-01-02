@@ -6,7 +6,7 @@ use core::mem::MaybeUninit;
 use core::ptr;
 use state::State;
 use types::TransactionReceipt;
-use types::ADDRESS_LEN;
+use types::{ADDRESS_LEN, SV32_PAGE_SIZE};
 use types::transaction::TransactionBundle;
 
 use crate::Task;
@@ -45,6 +45,17 @@ pub const MAX_INPUT_LEN: usize = 1024;
 pub const CODE_SIZE_LIMIT: usize = 0x30000;
 /// Reserved space for read-only data in the user window.
 pub const RO_DATA_SIZE_LIMIT: usize = 0x2000;
+/// User VA base for program mappings.
+pub const PROGRAM_VA_BASE: u32 = 0x0;
+/// User stack size (bytes).
+pub const STACK_BYTES: usize = 0x4000; // 16 KiB user stack
+/// User heap size (bytes).
+pub const HEAP_BYTES: usize = 0x8000; // 32 KiB user heap
+/// Total mapped window for a program: code/rodata, stack, and heap.
+pub const PROGRAM_WINDOW_BYTES: usize = align_up(
+    CODE_SIZE_LIMIT + RO_DATA_SIZE_LIMIT + STACK_BYTES + HEAP_BYTES,
+    SV32_PAGE_SIZE,
+);
 /// Start of the user heap within the program window.
 pub const HEAP_START_ADDR: usize = CODE_SIZE_LIMIT + RO_DATA_SIZE_LIMIT + 0x100;
 /// Maximum size of a program result payload.
@@ -55,12 +66,14 @@ pub const PROGRAM_START_ADDR: u32 = 0x400;
 pub const RESULT_ADDR: u32 = 0x100;
 /// Kernel VA for the serialized result header handoff.
 pub const KERNEL_RESULT_ADDR: u32 = 0x100;
+/// User VA base for call arguments placed just above the program window.
+pub(crate) const CALL_ARGS_PAGE_BASE: u32 = PROGRAM_VA_BASE + PROGRAM_WINDOW_BYTES as u32;
 /// User VA where the "to" address bytes are copied for program calls.
-pub(crate) const TO_PTR_ADDR: u32 = 0x120;
+pub(crate) const TO_PTR_ADDR: u32 = CALL_ARGS_PAGE_BASE + 0x100;
 /// User VA where the "from" address bytes are copied for program calls.
 pub(crate) const FROM_PTR_ADDR: u32 = TO_PTR_ADDR + ADDRESS_LEN as u32;
-/// User VA base for the input buffer in the program heap window.
-pub(crate) const INPUT_BASE_ADDR: u32 = HEAP_START_ADDR as u32;
+/// User VA base for the input buffer in the call-args page.
+pub(crate) const INPUT_BASE_ADDR: u32 = FROM_PTR_ADDR + ADDRESS_LEN as u32;
 
 // ============================================
 // Task Scheduling and Bookkeeping
@@ -189,3 +202,7 @@ pub static ROOT_PPN: Global<u32> = Global::new(0);
 pub static PAGE_ALLOC: Global<Option<PageAllocator>> = Global::new(None);
 /// Kernel heap allocator instance.
 pub static KERNEL_HEAP: Global<BumpAllocator> = Global::new(BumpAllocator::empty());
+
+const fn align_up(val: usize, align: usize) -> usize {
+    (val + (align - 1)) & !(align - 1)
+}
