@@ -70,7 +70,7 @@ pub const PROGRAM_VA_BASE: u32 = 0x0;
 // is mapped into both roots so satp can be switched without invalidating the
 // instruction stream mid-flight.
 pub const TRAMPOLINE_VA: u32 =
-    (PROGRAM_VA_BASE as usize + PROGRAM_WINDOW_BYTES) as u32; // Shared page just past user window.
+    (PROGRAM_VA_BASE as usize + PROGRAM_WINDOW_BYTES + 0x10000) as u32; // Shared page outside the kernel window.
 const TRAP_TRAMPOLINE_OFFSET: usize = 0x10; // Offset for the trap-entry stub within the page.
 pub const TRAP_TRAMPOLINE_VA: u32 =
     TRAMPOLINE_VA + TRAP_TRAMPOLINE_OFFSET as u32; // stvec target for user-mode traps.

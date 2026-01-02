@@ -58,12 +58,15 @@ pub unsafe extern "C" fn trap_entry() -> ! {
             "call {swap} # switch to kernel stack and reserve trap frame",
             "call {save} # save regs on kernel stack",
             "mv s0, a0 # preserve trap frame pointer across handle_trap",
+            "call {ensure} # restore kernel root if we trapped from user",
+            "mv a0, s0 # restore trap frame pointer for handle_trap",
             "call {handler} # run Rust trap handler",
             "mv a2, a1 # stash return kind",
             "mv a1, s0 # restore trap frame pointer for restore",
             "j {restore}",
             swap = sym swap_to_kernel_stack,
             save = sym save_trap_frame,
+            ensure = sym ensure_kernel_root_for_trap,
             handler = sym handle_trap,
             restore = sym restore_trap_frame,
             options(noreturn),
@@ -226,6 +229,22 @@ pub extern "C" fn handle_trap(saved: *mut u32) -> (u32, u32) {
         _ => log!("unhandled trap"),
     }
     (return_sp, return_kind)
+}
+
+#[unsafe(no_mangle)]
+/// Restore the kernel address-space root for traps arriving from user mode.
+extern "C" fn ensure_kernel_root_for_trap() {
+    if read_sstatus() & SSTATUS_SPP != 0 {
+        return;
+    }
+    let kernel_root = unsafe {
+        TASKS
+            .get_mut()
+            .get(KERNEL_TASK_SLOT)
+            .map(|task| task.addr_space.root_ppn)
+            .unwrap_or_else(mmu::current_root)
+    };
+    mmu::set_current_root(kernel_root);
 }
 
 #[inline(always)]

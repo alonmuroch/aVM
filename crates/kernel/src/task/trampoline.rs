@@ -56,7 +56,8 @@ fn build_trap_trampoline(kernel_satp: u32, trap_entry: u32) -> [u32; TRAP_TRAMPO
 pub(super) fn map_trampoline_page(root_ppn: u32) {
     // Install a small trampoline page mapped in both roots so we can switch
     // satp safely before jumping into the user program.
-    let tramp_perms = mmu::PagePerms::user_rwx();
+    let kernel_tramp_perms = mmu::PagePerms::kernel_rwx();
+    let user_tramp_perms = mmu::PagePerms::new(true, false, true, true);
     let kernel_root = unsafe {
         TASKS
             .get_mut()
@@ -77,7 +78,12 @@ pub(super) fn map_trampoline_page(root_ppn: u32) {
         let base = TRAP_TRAMPOLINE_OFFSET + i * 4;
         tramp_bytes[base..base + 4].copy_from_slice(&word.to_le_bytes());
     }
-    if !mmu::map_range_for_root(kernel_root, TRAMPOLINE_VA, PAGE_SIZE, tramp_perms) {
+    if !mmu::map_range_for_root(
+        kernel_root,
+        TRAMPOLINE_VA,
+        PAGE_SIZE,
+        kernel_tramp_perms,
+    ) {
         panic!("prep_program_task: failed to map trampoline page in kernel root");
     }
     if !mmu::copy(kernel_root, TRAMPOLINE_VA, &tramp_bytes) {
@@ -85,14 +91,16 @@ pub(super) fn map_trampoline_page(root_ppn: u32) {
     }
     let tramp_phys = match mmu::translate(kernel_root, TRAMPOLINE_VA) {
         Some(p) => p as u32,
-        None => panic!("prep_program_task: trampoline VA not mapped in kernel root"),
+        None => {
+            panic!("prep_program_task: trampoline VA not mapped in kernel root");
+        }
     };
     if !mmu::map_physical_range_for_root(
         root_ppn,
         TRAMPOLINE_VA,
         tramp_phys,
         PAGE_SIZE,
-        tramp_perms,
+        user_tramp_perms,
     ) {
         panic!("prep_program_task: failed to map trampoline page in user root");
     }
