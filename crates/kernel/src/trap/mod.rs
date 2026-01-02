@@ -295,7 +295,7 @@ fn write_result_to_caller(caller_task: &mut Task, result: &VmResult) -> Option<u
     if data_len > 0 {
         buf[9..9 + data_len].copy_from_slice(&result.data[..data_len]);
     }
-    if !mmu::copy_into_user(caller_task.addr_space.root_ppn, addr, &buf) {
+    if !mmu::copy(caller_task.addr_space.root_ppn, addr, &buf) {
         return None;
     }
     Some(addr)

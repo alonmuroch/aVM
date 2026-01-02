@@ -84,7 +84,7 @@ pub(crate) fn sys_balance(args: [u32; 6]) -> u32 {
         return 0;
     }
     let bytes = balance.to_le_bytes();
-    if !mmu::copy_into_user(root_ppn, addr, &bytes) {
+    if !mmu::copy(root_ppn, addr, &bytes) {
         logf!("sys_balance: failed to write to 0x%x", addr);
         return 0;
     }

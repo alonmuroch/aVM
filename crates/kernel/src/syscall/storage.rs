@@ -92,7 +92,7 @@ pub(crate) fn sys_storage_get(args: [u32; 6]) -> u32 {
     buf.extend_from_slice(&(value.len() as u32).to_le_bytes());
     buf.extend_from_slice(&value);
 
-    if !mmu::copy_into_user(root_ppn, addr, &buf) {
+    if !mmu::copy(root_ppn, addr, &buf) {
         logf!("sys_storage_get: failed to write to 0x%x", addr);
         return 0;
     }
@@ -185,7 +185,7 @@ pub(crate) fn read_user_bytes(root_ppn: u32, ptr: u32, len: usize) -> Option<Vec
     let mut dst_off = 0usize;
     let mut va = ptr;
     while remaining > 0 {
-        let phys = match mmu::translate_user_va(root_ppn, va) {
+        let phys = match mmu::translate(root_ppn, va) {
             Some(p) => p,
             None => {
                 logf!("sys_storage: invalid memory access 0x%x", va);

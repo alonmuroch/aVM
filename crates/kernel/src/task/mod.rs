@@ -55,6 +55,7 @@ use types::ADDRESS_LEN;
 pub mod task;
 pub mod prep;
 pub mod run;
+mod trampoline;
 
 pub use task::{AddressSpace, Task, TrapFrame};
 pub use prep::prep_program_task;

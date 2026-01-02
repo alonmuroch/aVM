@@ -117,7 +117,7 @@ pub fn total_ppn() -> Option<u32> {
 }
 
 /// Map a user-visible virtual range with the provided permissions into a specific root.
-pub fn map_user_range_for_root(root_ppn: u32, va_start: u32, len: usize, perms: PagePerms) -> bool {
+pub fn map_range_for_root(root_ppn: u32, va_start: u32, len: usize, perms: PagePerms) -> bool {
     if len == 0 {
         return true;
     }
@@ -141,7 +141,7 @@ pub fn map_user_range_for_root(root_ppn: u32, va_start: u32, len: usize, perms: 
             let available = alloc.remaining_ppn() as usize;
             if needed > available {
                 panic!(
-                    "map_user_range_for_root: out of physical memory (need {} pages, have {})",
+                    "map_range_for_root: out of physical memory (need {} pages, have {})",
                     needed, available
                 );
             }
@@ -155,7 +155,7 @@ pub fn map_user_range_for_root(root_ppn: u32, va_start: u32, len: usize, perms: 
 /// Map a user-visible virtual range with the provided permissions into the current root.
 pub fn map_user_range(va_start: u32, len: usize, perms: PagePerms) -> bool {
     let root = unsafe { *ROOT_PPN.get_mut() };
-    map_user_range_for_root(root, va_start, len, perms)
+    map_range_for_root(root, va_start, len, perms)
 }
 
 /// Map a kernel-only virtual range with the provided permissions into a specific root.
@@ -214,7 +214,7 @@ pub fn mirror_user_range_into_kernel(user_root: u32, va_start: u32, len: usize, 
     };
     let mut va = start;
     while va < end {
-        let phys = match translate_user_va(user_root, va) {
+        let phys = match translate(user_root, va) {
             Some(p) => p as u32,
             None => return false,
         };
@@ -227,7 +227,7 @@ pub fn mirror_user_range_into_kernel(user_root: u32, va_start: u32, len: usize, 
 }
 
 /// Walk Sv32 to translate a VA in the given root to a physical address.
-pub fn translate_user_va(root_ppn: u32, va: u32) -> Option<usize> {
+pub fn translate(root_ppn: u32, va: u32) -> Option<usize> {
     let vpn1 = (va >> 22) & SV32_VPN_MASK;
     let vpn0 = (va >> 12) & SV32_VPN_MASK;
     let offset = (va & 0xfff) as usize;
@@ -254,13 +254,13 @@ pub fn translate_user_va(root_ppn: u32, va: u32) -> Option<usize> {
 
 /// Peek a 32-bit value at a VA in a given root using the direct-map window.
 pub fn peek_word(root_ppn: u32, va: u32) -> Option<u32> {
-    let phys = translate_user_va(root_ppn, va)?;
+    let phys = translate(root_ppn, va)?;
     let va_ptr = direct_map_addr(phys)?;
     Some(unsafe { (va_ptr as *const u32).read_volatile() })
 }
 
 /// Copy data into a user VA range for a specific root using the direct-map window.
-pub fn copy_into_user(root_ppn: u32, va_start: u32, data: &[u8]) -> bool {
+pub fn copy(root_ppn: u32, va_start: u32, data: &[u8]) -> bool {
     if data.is_empty() {
         return true;
     }
@@ -268,7 +268,7 @@ pub fn copy_into_user(root_ppn: u32, va_start: u32, data: &[u8]) -> bool {
     let mut src_off = 0usize;
     let mut va = va_start;
     while remaining > 0 {
-        let phys = match translate_user_va(root_ppn, va) {
+        let phys = match translate(root_ppn, va) {
             Some(p) => p,
             None => return false,
         };

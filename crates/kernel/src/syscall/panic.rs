@@ -26,7 +26,7 @@ pub(crate) fn sys_panic_with_message(msg_ptr: u32, msg_len: u32) -> u32 {
     let mut dst_off = 0usize;
     let mut va = msg_ptr;
     while remaining > 0 {
-        let phys = match mmu::translate_user_va(root_ppn, va) {
+        let phys = match mmu::translate(root_ppn, va) {
             Some(p) => p,
             None => {
                 logf!("sys_panic: invalid msg ptr 0x%x", va);
