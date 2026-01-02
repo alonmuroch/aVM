@@ -5,8 +5,7 @@ use clibc::logf;
 use state::State;
 use types::address::Address;
 
-use crate::global::STATE;
-use crate::Config;
+use crate::global::{CODE_SIZE_LIMIT, RO_DATA_SIZE_LIMIT, STATE};
 
 pub struct ProgramImage<'a> {
     pub code: &'a [u8],
@@ -64,7 +63,7 @@ pub fn with_program_image<R>(
 
     // Enforce the code size limit to prevent oversized binaries.
     let code_len = account.code.len();
-    let max = Config::CODE_SIZE_LIMIT + Config::RO_DATA_SIZE_LIMIT;
+    let max = CODE_SIZE_LIMIT + RO_DATA_SIZE_LIMIT;
     if code_len > max {
         panic!(
             "❌ Program call rejected: code size ({}) exceeds limit ({})",

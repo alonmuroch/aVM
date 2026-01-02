@@ -2,8 +2,6 @@
 #![feature(naked_functions)]
 #![feature(alloc_error_handler)]
 
-pub mod config;
-pub use config::Config;
 pub use types::boot::BootInfo;
 pub mod global;
 pub mod task;

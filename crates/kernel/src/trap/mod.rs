@@ -2,13 +2,15 @@ use core::arch::asm;
 use clibc::{log, logf};
 use types::result::{Result as VmResult, RESULT_DATA_SIZE};
 
-use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, LAST_COMPLETED_TASK, TASKS};
+use crate::global::{
+    CURRENT_TASK, KERNEL_TASK_SLOT, LAST_COMPLETED_TASK, MAX_RESULT_SIZE, RESULT_ADDR, TASKS,
+};
 use crate::memory::page_allocator as mmu;
 use crate::syscall;
 use crate::syscall::alloc::alloc_in_task;
 use crate::syscall::storage::read_user_bytes;
 use crate::task::TRAMPOLINE_VA;
-use crate::{Config, Task};
+use crate::Task;
 
 mod save_trap_frame;
 mod restore_trap_frame;
@@ -270,7 +272,7 @@ fn read_sstatus() -> u32 {
 
 fn read_task_result(task: &Task) -> Option<VmResult> {
     let result_bytes =
-        read_user_bytes(task.addr_space.root_ppn, Config::RESULT_ADDR, Config::MAX_RESULT_SIZE)?;
+        read_user_bytes(task.addr_space.root_ppn, RESULT_ADDR, MAX_RESULT_SIZE)?;
     if result_bytes.len() < 9 {
         return None;
     }
@@ -305,8 +307,8 @@ fn log_task_result(result: &VmResult) {
 }
 
 fn write_result_to_caller(caller_task: &mut Task, result: &VmResult) -> Option<u32> {
-    let addr = alloc_in_task(caller_task, Config::MAX_RESULT_SIZE as u32, 4)?;
-    let mut buf = [0u8; Config::MAX_RESULT_SIZE];
+    let addr = alloc_in_task(caller_task, MAX_RESULT_SIZE as u32, 4)?;
+    let mut buf = [0u8; MAX_RESULT_SIZE];
     buf[0] = result.success as u8;
     buf[1..5].copy_from_slice(&result.error_code.to_le_bytes());
     buf[5..9].copy_from_slice(&result.data_len.to_le_bytes());

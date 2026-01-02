@@ -1,5 +1,6 @@
-use kernel::Config;
-use kernel::global::{CURRENT_TX, LAST_COMPLETED_TASK, RECEIPTS, STATE, TASKS};
+use kernel::global::{
+    CURRENT_TX, KERNEL_RESULT_ADDR, LAST_COMPLETED_TASK, RECEIPTS, STATE, TASKS,
+};
 use kernel::memory::heap;
 use clibc::{log, logf};
 use types::{KernelResult, TransactionReceipt};
@@ -89,7 +90,7 @@ pub(crate) fn write_kernel_result() {
         state_len,
     };
     unsafe {
-        core::ptr::write_volatile(Config::KERNEL_RESULT_ADDR as *mut KernelResult, header);
+        core::ptr::write_volatile(KERNEL_RESULT_ADDR as *mut KernelResult, header);
     }
     logf!(
         "kernel_result: receipts_ptr=0x%x receipts_len=%d",

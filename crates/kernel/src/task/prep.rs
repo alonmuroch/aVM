@@ -1,12 +1,15 @@
-use crate::{AddressSpace, Config, Task};
-use crate::global::CURRENT_TASK;
+use crate::{AddressSpace, Task};
+use crate::global::{
+    CODE_SIZE_LIMIT, CURRENT_TASK, FROM_PTR_ADDR, HEAP_START_ADDR, INPUT_BASE_ADDR, MAX_INPUT_LEN,
+    RO_DATA_SIZE_LIMIT, TO_PTR_ADDR,
+};
 use crate::memory::page_allocator as mmu;
 use clibc::{log, logf};
 use types::address::Address;
 
 use super::{
-    alloc_asid, trampoline::map_trampoline_page, FROM_PTR_ADDR, INPUT_BASE_ADDR, PROGRAM_VA_BASE,
-    PROGRAM_WINDOW_BYTES, REG_A0, REG_A1, REG_A2, REG_A3, REG_SP, STACK_BYTES, TO_PTR_ADDR,
+    alloc_asid, trampoline::map_trampoline_page, PROGRAM_VA_BASE, PROGRAM_WINDOW_BYTES, REG_A0,
+    REG_A1, REG_A2, REG_A3, REG_SP, STACK_BYTES,
 };
 
 /// Create a new task for a program and map its virtual address window via syscalls.
@@ -24,7 +27,7 @@ pub fn prep_program_task(
     input: &[u8],
     entry_off: u32,
 ) -> Option<Task> {
-    if input.len() > Config::MAX_INPUT_LEN {
+    if input.len() > MAX_INPUT_LEN {
         log!("launch_program: input too large");
         return None;
     }
@@ -113,13 +116,13 @@ pub fn prep_program_task(
             PROGRAM_VA_BASE,
             PROGRAM_WINDOW_BYTES as u32,
         ),
-        Config::HEAP_START_ADDR as u32,
+        HEAP_START_ADDR as u32,
     );
     let caller = unsafe { *CURRENT_TASK.get_mut() };
     task.caller_task_id = Some(caller);
     // Set up initial trapframe.
     let stack_top = PROGRAM_VA_BASE
-        .wrapping_add((Config::CODE_SIZE_LIMIT + Config::RO_DATA_SIZE_LIMIT + STACK_BYTES) as u32);
+        .wrapping_add((CODE_SIZE_LIMIT + RO_DATA_SIZE_LIMIT + STACK_BYTES) as u32);
     task.tf.pc = entry_va;
     task.tf.regs[REG_SP] = stack_top;
     task.tf.regs[REG_A0] = TO_PTR_ADDR;
@@ -141,7 +144,7 @@ pub fn prep_program_task(
         "prep_program_task: stack window=[0x%x,0x%x) heap_base=0x%x",
         stack_base,
         stack_top,
-        Config::HEAP_START_ADDR as u32
+        HEAP_START_ADDR as u32
     );
 
     Some(task)

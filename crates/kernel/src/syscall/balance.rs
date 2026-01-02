@@ -7,7 +7,7 @@ use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, STATE};
 use crate::memory::page_allocator as mmu;
 use crate::syscall::alloc::sys_alloc;
 use crate::syscall::storage::{current_root_ppn, read_user_bytes};
-use crate::task::FROM_PTR_ADDR;
+use crate::global::FROM_PTR_ADDR;
 
 pub(crate) fn sys_transfer(args: [u32; 6]) -> u32 {
     let current = unsafe { *CURRENT_TASK.get_mut() };

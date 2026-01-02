@@ -43,7 +43,7 @@ macro_rules! entrypoint {
         ) {
             // EDUCATIONAL: Write result directly to predetermined memory location
             // This prevents conflicts with macros that might overwrite A4
-            // Must match Config::RESULT_ADDR in crates/avm/src/global.rs
+            // Must match global::RESULT_ADDR in crates/kernel/src/global.rs
             const RESULT_ADDR: usize = 0x100; // Predetermined memory address for result object
 
             // EDUCATIONAL: Convert raw pointer to contract address

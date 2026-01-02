@@ -1,12 +1,11 @@
 use clibc::logf;
 use types::{Address, ADDRESS_LEN};
 
-use crate::global::{CURRENT_TASK, TASKS};
+use crate::global::{CURRENT_TASK, MAX_INPUT_LEN, TASKS};
 use crate::syscall::storage::{caller_address_matches, current_root_ppn, read_user_bytes};
 use crate::syscall::SyscallContext;
 use crate::task::prep_program_task;
 use crate::user_program::with_program_image;
-use crate::Config;
 
 const REG_COUNT: usize = 32;
 const REG_PC: usize = 32;
@@ -17,7 +16,7 @@ pub(crate) fn sys_call_program(args: [u32; 6], ctx: &mut SyscallContext<'_>) -> 
     let input_ptr = args[2];
     let input_len = args[3] as usize;
 
-    if input_len > Config::MAX_INPUT_LEN {
+    if input_len > MAX_INPUT_LEN {
         logf!("sys_call_program: input too large");
         return 0;
     }

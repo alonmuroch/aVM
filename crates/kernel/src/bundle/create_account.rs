@@ -1,5 +1,4 @@
-use kernel::global::STATE;
-use kernel::Config;
+use kernel::global::{CODE_SIZE_LIMIT, RO_DATA_SIZE_LIMIT, STATE};
 use clibc::logf;
 use clibc::parser::HexCodec;
 use state::State;
@@ -19,7 +18,7 @@ pub(crate) fn create_account(tx: &Transaction) {
         code_size as u32
     );
 
-    let max = Config::CODE_SIZE_LIMIT + Config::RO_DATA_SIZE_LIMIT;
+    let max = CODE_SIZE_LIMIT + RO_DATA_SIZE_LIMIT;
     if code_size > max {
         panic!(
             "❌ Code size ({}) exceeds CODE_SIZE_LIMIT ({} bytes)",

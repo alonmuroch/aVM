@@ -48,9 +48,7 @@
 // - We currently do not touch sstatus/mstatus or perform sfence.vma; add those
 //   when modeling fuller privilege transitions.
 
-use crate::Config;
-use crate::global::NEXT_ASID;
-use types::ADDRESS_LEN;
+use crate::global::{CODE_SIZE_LIMIT, NEXT_ASID, RO_DATA_SIZE_LIMIT};
 
 pub mod task;
 pub mod prep;
@@ -80,7 +78,7 @@ const fn align_up(val: usize, align: usize) -> usize {
 
 /// Total mapped window for a program: code/rodata, stack, and heap.
 pub const PROGRAM_WINDOW_BYTES: usize = align_up(
-    Config::CODE_SIZE_LIMIT + Config::RO_DATA_SIZE_LIMIT + STACK_BYTES + HEAP_BYTES,
+    CODE_SIZE_LIMIT + RO_DATA_SIZE_LIMIT + STACK_BYTES + HEAP_BYTES,
     PAGE_SIZE,
 );
 
@@ -99,10 +97,6 @@ const TRAMPOLINE_CODE: [u32; 2] = [
     0x1802_9073, // csrw satp, t0
     0x1020_0073, // sret
 ];
-
-pub(crate) const TO_PTR_ADDR: u32 = 0x120;
-pub(crate) const FROM_PTR_ADDR: u32 = TO_PTR_ADDR + ADDRESS_LEN as u32;
-const INPUT_BASE_ADDR: u32 = Config::HEAP_START_ADDR as u32;
 
 pub(super) fn alloc_asid() -> u16 {
     unsafe {
