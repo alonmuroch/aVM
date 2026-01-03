@@ -10,7 +10,7 @@ pub struct RunOptions {
     pub timeout_ms: Option<u64>,
     pub vm_memory_size: Option<usize>,
     pub verbose: bool,
-    pub input: Vec<u8>,
+    pub input: Vec<Vec<u8>>,
 }
 
 #[derive(Debug, Clone)]

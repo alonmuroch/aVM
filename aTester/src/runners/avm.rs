@@ -38,11 +38,23 @@ impl ArchRunner for AvmRunner {
         let heap_ptr = Rc::new(Cell::new(0u32));
         let entry_point = load_kernel(&elf_bytes, &memory, heap_ptr.as_ref())?;
 
-        let input_ptr = if options.input.is_empty() {
-            0
-        } else {
-            alloc_on_heap(memory.as_ref(), heap_ptr.as_ref(), &options.input)
-        };
+        if options.input.len() > 3usize {
+            return Err(RunError {
+                message: format!("too many inputs ({}); max is 3", options.input.len()),
+            });
+        }
+        let mut input_ptrs = [0u32; 3];
+        let mut input_lens = [0u32; 3];
+        for idx in 0..options.input.len() {
+            let bytes = options
+                .input
+                .get(idx)
+                .map(|input| input.as_slice())
+                .unwrap_or(&[]);
+            let ptr = alloc_on_heap(memory.as_ref(), heap_ptr.as_ref(), bytes);
+            input_ptrs[idx] = ptr;
+            input_lens[idx] = bytes.len() as u32;
+        }
         let boot_info_ptr = place_boot_info(memory.as_ref(), heap_ptr.as_ref(), total_size)?;
 
         let mut vm = VM::new(memory.clone());
@@ -52,9 +64,25 @@ impl ArchRunner for AvmRunner {
         let writer = Rc::new(RefCell::new(StringWriter::default()));
         vm.cpu.set_verbose_writer(writer.clone());
         vm.cpu.pc = entry_point;
-        vm.set_reg_u32(Register::A0, input_ptr);
-        vm.set_reg_u32(Register::A1, options.input.len() as u32);
-        vm.set_reg_u32(Register::A2, boot_info_ptr);
+
+        // set input regs
+        const ARG_REGS: [Register; 8] = [
+            Register::A0,
+            Register::A1,
+            Register::A2,
+            Register::A3,
+            Register::A4,
+            Register::A5,
+            Register::A6,
+            Register::A7,
+        ];
+        for (idx, ptr) in input_ptrs.iter().enumerate() {
+            let reg_idx = idx * 2;
+            vm.set_reg_u32(ARG_REGS[reg_idx], *ptr);
+            vm.set_reg_u32(ARG_REGS[reg_idx + 1], input_lens[idx]);
+        }
+        vm.set_reg_u32(Register::A6, boot_info_ptr);
+        vm.set_reg_u32(Register::A7, 0);
 
         vm.raw_run();
 
