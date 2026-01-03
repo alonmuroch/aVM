@@ -25,9 +25,13 @@ pub const SV32_DIRECT_MAP_BASE: u32 = 0x4000_0000;
 /// Simple permission descriptor for Sv32 mappings.
 #[derive(Clone, Copy, Debug)]
 pub struct Sv32PagePerms {
+    /// Allow load access (read data from this page).
     pub read: bool,
+    /// Allow store access (write data to this page).
     pub write: bool,
+    /// Allow instruction fetches from this page.
     pub exec: bool,
+    /// Mark the page as user-accessible (U bit set).
     pub user: bool,
 }
 

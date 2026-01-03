@@ -25,5 +25,7 @@ impl TestResults {
 
 pub unsafe fn write_results(results: TestResults) {
     let ptr = TEST_RESULTS_ADDR as *mut TestResults;
-    ptr.write_volatile(results);
+    unsafe {
+        ptr.write_volatile(results);
+    }
 }

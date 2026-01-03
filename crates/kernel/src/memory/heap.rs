@@ -51,6 +51,9 @@ pub fn alloc(size: usize, align: usize) -> Option<*mut u8> {
     }
 }
 
+/// Deallocate a kernel buffer. Bump allocator does not reclaim memory yet.
+pub fn dealloc(_ptr: *mut u8, _size: usize, _align: usize) {}
+
 fn align_up(value: usize, align: usize) -> Option<usize> {
     let mask = align - 1;
     value.checked_add(mask).map(|v| v & !mask)

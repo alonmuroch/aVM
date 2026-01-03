@@ -252,6 +252,28 @@ pub fn translate(root_ppn: u32, va: u32) -> Option<usize> {
     ppn.checked_mul(PAGE_SIZE)?.checked_add(offset)
 }
 
+fn leaf_pte(root_ppn: u32, va: u32) -> Option<u32> {
+    let vpn1 = (va >> 22) & SV32_VPN_MASK;
+    let vpn0 = (va >> 12) & SV32_VPN_MASK;
+
+    let l1_base = (root_ppn as usize)
+        .checked_mul(PAGE_SIZE)?;
+    let l1_addr = l1_base + vpn1 as usize * core::mem::size_of::<u32>();
+    let l1_pte = read_pte(l1_addr)?;
+    if l1_pte & SV32_PTE_V == 0 || l1_pte & (SV32_PTE_R | SV32_PTE_W | SV32_PTE_X) != 0 {
+        return None;
+    }
+
+    let l2_base = ((l1_pte >> 10) as usize)
+        .checked_mul(PAGE_SIZE)?;
+    let l2_addr = l2_base + vpn0 as usize * core::mem::size_of::<u32>();
+    let l2_pte = read_pte(l2_addr)?;
+    if l2_pte & SV32_PTE_V == 0 {
+        return None;
+    }
+    Some(l2_pte)
+}
+
 /// Peek a 32-bit value at a VA in a given root using the direct-map window.
 pub fn peek_word(root_ppn: u32, va: u32) -> Option<u32> {
     let phys = translate(root_ppn, va)?;
@@ -268,6 +290,48 @@ pub fn copy(root_ppn: u32, va_start: u32, data: &[u8]) -> bool {
     let mut src_off = 0usize;
     let mut va = va_start;
     while remaining > 0 {
+        let phys = match translate(root_ppn, va) {
+            Some(p) => p,
+            None => return false,
+        };
+        let page_off = (va as usize) & (PAGE_SIZE - 1);
+        let to_copy = cmp::min(remaining, PAGE_SIZE - page_off);
+        let dst = match direct_map_addr(phys) {
+            Some(v) => v,
+            None => return false,
+        };
+        unsafe {
+            ptr::copy_nonoverlapping(
+                data.as_ptr().add(src_off),
+                dst as *mut u8,
+                to_copy,
+            );
+        }
+        remaining -= to_copy;
+        src_off += to_copy;
+        va = va.wrapping_add(to_copy as u32);
+    }
+    true
+}
+
+/// Copy data into a user VA range, failing if any page is not user-writable.
+pub fn copy_user(root_ppn: u32, va_start: u32, data: &[u8]) -> bool {
+    if data.is_empty() {
+        return true;
+    }
+    let mut remaining = data.len();
+    let mut src_off = 0usize;
+    let mut va = va_start;
+    while remaining > 0 {
+        let pte = match leaf_pte(root_ppn, va) {
+            Some(p) => p,
+            None => return false,
+        };
+        let is_user = (pte & SV32_PTE_U) != 0;
+        let can_write = (pte & SV32_PTE_W) != 0;
+        if !is_user || !can_write {
+            return false;
+        }
         let phys = match translate(root_ppn, va) {
             Some(p) => p,
             None => return false,

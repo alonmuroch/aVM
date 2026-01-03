@@ -28,3 +28,13 @@ required-features = ["guest_kernel"]
 name = "kernel_first_test"
 path = "src/tests/first_test.rs"
 required-features = ["guest_kernel"]
+
+[[bin]]
+name = "kernel_mem_alloc_test"
+path = "src/tests/mem_alloc_test.rs"
+required-features = ["guest_kernel"]
+
+[[bin]]
+name = "kernel_mem_map_test"
+path = "src/tests/mem_map_test.rs"
+required-features = ["guest_kernel"]
