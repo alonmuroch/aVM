@@ -217,21 +217,25 @@ fn map_page<T: Sv32PageTable>(
     };
     let l2_entry_addr = l2_base + vpn0 as usize * mem::size_of::<u32>();
 
-    if let Some(existing) = pt.read_pte(l2_entry_addr) {
-        if existing & SV32_PTE_V != 0 {
-            // Already mapped.
-            return true;
-        }
-    }
+    let existing = pt.read_pte(l2_entry_addr).unwrap_or(0);
+    let existing_valid = (existing & SV32_PTE_V) != 0;
+    let existing_ppn = existing >> 10;
 
-    let leaf_ppn = match phys_override {
-        Some(phys) => {
+    let leaf_ppn = match (existing_valid, phys_override) {
+        (true, Some(phys)) => {
             if (phys as usize) % page_size != 0 {
                 return false;
             }
             phys / page_size as u32
         }
-        None => match pt.alloc_frame() {
+        (true, None) => existing_ppn,
+        (false, Some(phys)) => {
+            if (phys as usize) % page_size != 0 {
+                return false;
+            }
+            phys / page_size as u32
+        }
+        (false, None) => match pt.alloc_frame() {
             Some(ppn) => {
                 pt.zero_frame(ppn);
                 ppn

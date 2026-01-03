@@ -314,13 +314,12 @@ pub fn copy(root_ppn: u32, va_start: u32, data: &[u8]) -> bool {
     true
 }
 
-/// Copy data into a user VA range, failing if any page is not user-writable.
+/// Copy data into a user VA range atomically, failing if any page is not user-writable.
 pub fn copy_user(root_ppn: u32, va_start: u32, data: &[u8]) -> bool {
     if data.is_empty() {
         return true;
     }
     let mut remaining = data.len();
-    let mut src_off = 0usize;
     let mut va = va_start;
     while remaining > 0 {
         let pte = match leaf_pte(root_ppn, va) {
@@ -332,6 +331,23 @@ pub fn copy_user(root_ppn: u32, va_start: u32, data: &[u8]) -> bool {
         if !is_user || !can_write {
             return false;
         }
+        let phys = match translate(root_ppn, va) {
+            Some(p) => p,
+            None => return false,
+        };
+        if direct_map_addr(phys).is_none() {
+            return false;
+        }
+        let page_off = (va as usize) & (PAGE_SIZE - 1);
+        let to_copy = cmp::min(remaining, PAGE_SIZE - page_off);
+        remaining -= to_copy;
+        va = va.wrapping_add(to_copy as u32);
+    }
+
+    let mut remaining = data.len();
+    let mut src_off = 0usize;
+    let mut va = va_start;
+    while remaining > 0 {
         let phys = match translate(root_ppn, va) {
             Some(p) => p,
             None => return false,
