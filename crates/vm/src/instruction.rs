@@ -446,6 +446,8 @@ pub enum Instruction {
 
     /// MRET: Machine-mode return (treated as a halt in this VM)
     Mret,
+    /// SRET: Supervisor-mode return
+    Sret,
 
     /// C.MISC-ALU: compressed miscellaneous ALU operations
     /// EDUCATIONAL: Compressed miscellaneous ALU operations including C.SUB, C.XOR, C.OR, C.AND.
@@ -670,6 +672,8 @@ impl Instruction {
                 "ebreak".to_string(),
             Instruction::Mret =>
                 "mret".to_string(),
+            Instruction::Sret =>
+                "sret".to_string(),
             Instruction::Csr { rd, rs1, csr, op, imm } => {
                 let op_str = match op {
                     CsrOp::Csrrw => if *imm { "csrrwi" } else { "csrrw" },

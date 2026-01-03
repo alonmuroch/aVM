@@ -1,4 +1,4 @@
-use super::{Instruction, MemoryAccessKind, Memory, CPU, CSR_SATP, CSR_SEPC, SCAUSE_BREAKPOINT};
+use super::{Instruction, MemoryAccessKind, Memory, CPU, CSR_MEPC, CSR_SATP, CSR_SEPC, SCAUSE_BREAKPOINT};
 use crate::console::{console_write, CONSOLE_WRITE_ID};
 use crate::memory::VirtualAddress;
 use crate::instruction::CsrOp;
@@ -804,8 +804,8 @@ impl CPU {
                     }
                     return true;
                 }
-                if self.has_trap_vector() {
-                    if !self.trap_to_vector(self.ecall_cause(), 0, Some(call_id)) {
+                if let Some(trap_mode) = self.has_trap_vector() {
+                    if !self.trap_to_vector(trap_mode, self.ecall_cause(), 0, Some(call_id)) {
                         panic!(
                             "trap_to_vector returned false for ecall id={} pc=0x{:08x}",
                             call_id, self.pc
@@ -876,15 +876,32 @@ impl CPU {
             Instruction::Ebreak => {
                 // EDUCATIONAL: EBREAK - Environment Break - for debugging
                 // In real systems, this would trigger a debugger breakpoint
-                if self.priv_mode == super::PrivilegeMode::User && self.has_trap_vector() {
-                    if !self.trap_to_vector(SCAUSE_BREAKPOINT, 0, None) {
-                        panic!("trap_to_vector returned false for ebreak pc=0x{:08x}", self.pc);
+                if self.priv_mode == super::PrivilegeMode::User {
+                    if let Some(trap_mode) = self.has_trap_vector() {
+                        if !self.trap_to_vector(trap_mode, SCAUSE_BREAKPOINT, 0, None) {
+                            panic!(
+                                "trap_to_vector returned false for ebreak pc=0x{:08x}",
+                                self.pc
+                            );
+                        }
+                        return true;
                     }
-                    return true;
                 }
                 return false;
             }
             Instruction::Mret => {
+                let target = match self.read_csr(CSR_MEPC).or_else(|| self.read_csr(CSR_SEPC)) {
+                    Some(v) => v,
+                    None => return false,
+                };
+                let prev = self.take_sstatus_spp();
+                if !self.set_pc(target) {
+                    return false;
+                }
+                self.priv_mode = prev;
+                return true;
+            }
+            Instruction::Sret => {
                 let target = match self.read_csr(CSR_SEPC) {
                     Some(v) => v,
                     None => return false,

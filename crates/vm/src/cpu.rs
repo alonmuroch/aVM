@@ -15,8 +15,13 @@ pub const CSR_STVEC: u16 = 0x105;
 pub const CSR_SEPC: u16 = 0x141;
 pub const CSR_SCAUSE: u16 = 0x142;
 pub const CSR_STVAL: u16 = 0x143;
+pub const CSR_MEPC: u16 = 0x341;
+pub const CSR_MTVEC: u16 = 0x305;
+pub const CSR_MCAUSE: u16 = 0x342;
+pub const CSR_MTVAL: u16 = 0x343;
 const SCAUSE_ECALL_FROM_U: u32 = 8;
 const SCAUSE_ECALL_FROM_S: u32 = 9;
+const SCAUSE_ECALL_FROM_M: u32 = 11;
 const SCAUSE_BREAKPOINT: u32 = 3;
 const SSTATUS_SPP: u32 = 1 << 8;
 
@@ -24,6 +29,13 @@ const SSTATUS_SPP: u32 = 1 << 8;
 pub enum PrivilegeMode {
     User,
     Supervisor,
+    Machine,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TrapMode {
+    Supervisor,
+    Machine,
 }
 
 /// Represents the Central Processing Unit (CPU) of our RISC-V virtual machine.
@@ -206,6 +218,7 @@ impl CPU {
         match prev {
             PrivilegeMode::User => sstatus &= !SSTATUS_SPP,
             PrivilegeMode::Supervisor => sstatus |= SSTATUS_SPP,
+            PrivilegeMode::Machine => sstatus |= SSTATUS_SPP,
         }
         let _ = self.write_csr(CSR_SSTATUS, sstatus);
     }
@@ -226,30 +239,77 @@ impl CPU {
         match self.priv_mode {
             PrivilegeMode::User => SCAUSE_ECALL_FROM_U,
             PrivilegeMode::Supervisor => SCAUSE_ECALL_FROM_S,
+            PrivilegeMode::Machine => SCAUSE_ECALL_FROM_M,
         }
     }
 
-    fn trap_to_vector(&mut self, cause: u32, trap_value: u32, syscall_id: Option<u32>) -> bool {
-        if !self.write_csr(CSR_SEPC, self.pc) {
-            panic!("trap_to_vector: failed to write sepc");
+    fn trap_to_vector(
+        &mut self,
+        mode: TrapMode,
+        cause: u32,
+        trap_value: u32,
+        _syscall_id: Option<u32>,
+    ) -> bool {
+        match mode {
+            TrapMode::Machine => {
+                if !self.write_csr(CSR_MEPC, self.pc) {
+                    panic!("trap_to_vector: failed to write mepc");
+                }
+                if !self.write_csr(CSR_MCAUSE, cause) {
+                    panic!("trap_to_vector: failed to write mcause");
+                }
+                if !self.write_csr(CSR_MTVAL, trap_value) {
+                    panic!("trap_to_vector: failed to write mtval");
+                }
+                let mtvec = match self.read_csr(CSR_MTVEC) {
+                    Some(val) => val & !0x3,
+                    None => return false,
+                };
+                self.priv_mode = PrivilegeMode::Machine;
+                self.set_pc(mtvec)
+            }
+            TrapMode::Supervisor => {
+                if !self.write_csr(CSR_SEPC, self.pc) {
+                    panic!("trap_to_vector: failed to write sepc");
+                }
+                if !self.write_csr(CSR_SCAUSE, cause) {
+                    panic!("trap_to_vector: failed to write scause");
+                }
+                if !self.write_csr(CSR_STVAL, trap_value) {
+                    panic!("trap_to_vector: failed to write stval");
+                }
+                let stvec = match self.read_csr(CSR_STVEC) {
+                    Some(val) => val & !0x3,
+                    None => return false,
+                };
+                self.set_sstatus_spp(self.priv_mode);
+                self.priv_mode = PrivilegeMode::Supervisor;
+                self.set_pc(stvec)
+            }
         }
-        if !self.write_csr(CSR_SCAUSE, cause) {
-            panic!("trap_to_vector: failed to write scause");
-        }
-        if !self.write_csr(CSR_STVAL, trap_value) {
-            panic!("trap_to_vector: failed to write stval");
-        }
-        let stvec = match self.read_csr(CSR_STVEC) {
-            Some(val) => val & !0x3,
-            None => return false,
-        };
-        self.set_sstatus_spp(self.priv_mode);
-        self.priv_mode = PrivilegeMode::Supervisor;
-        self.set_pc(stvec)
     }
 
-    fn has_trap_vector(&self) -> bool {
-        self.csrs.contains_key(&CSR_STVEC)
+    fn has_trap_vector(&self) -> Option<TrapMode> {
+        match self.priv_mode {
+            PrivilegeMode::Machine => {
+                if self.csrs.contains_key(&CSR_MTVEC) {
+                    Some(TrapMode::Machine)
+                } else if self.csrs.contains_key(&CSR_STVEC) {
+                    Some(TrapMode::Supervisor)
+                } else {
+                    None
+                }
+            }
+            PrivilegeMode::Supervisor | PrivilegeMode::User => {
+                if self.csrs.contains_key(&CSR_STVEC) {
+                    Some(TrapMode::Supervisor)
+                } else if self.csrs.contains_key(&CSR_MTVEC) {
+                    Some(TrapMode::Machine)
+                } else {
+                    None
+                }
+            }
+        }
     }
 
     /// Executes a single instruction cycle (fetch, decode, execute).
