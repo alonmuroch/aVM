@@ -6,7 +6,9 @@ use clibc::log;
 use kernel::BootInfo;
 use kernel::memory::page_allocator;
 
+#[path = "../../tests/results.rs"]
 mod results;
+#[path = "../../tests/utils.rs"]
 mod utils;
 
 #[unsafe(no_mangle)]

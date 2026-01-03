@@ -18,7 +18,7 @@ kernel:
 	@mkdir -p $(KERNEL_OUT_DIR)
 	@$(AVM32) all --bin kernel --manifest-path $(KERNEL_MANIFEST) --features guest_kernel --out-dir $(KERNEL_OUT_DIR) --src crates/kernel/src/main.rs
 	@echo "=== Building kernel test ELFs ==="
-	@$(foreach bin,$(KERNEL_TEST_BINS),$(AVM32) all --bin $(bin) --manifest-path $(KERNEL_MANIFEST) --features guest_kernel --out-dir $(KERNEL_OUT_DIR) --src crates/kernel/src/tests/$(patsubst kernel_%,%,$(bin)).rs;)
+	@$(foreach bin,$(KERNEL_TEST_BINS),$(AVM32) all --bin $(bin) --manifest-path $(KERNEL_MANIFEST) --features guest_kernel --out-dir $(KERNEL_OUT_DIR) --src crates/kernel/src/memory/tests/$(patsubst kernel_%,%,$(bin)).rs;)
 
 run_examples:
 	@echo "=== Building example programs ==="

@@ -8,7 +8,9 @@ use core::slice;
 use clibc::log;
 use kernel::BootInfo;
 
+#[path = "../../tests/utils.rs"]
 mod utils;
+#[path = "../../tests/results.rs"]
 mod results;
 
 #[unsafe(no_mangle)]

@@ -26,30 +26,30 @@ required-features = ["guest_kernel"]
 
 [[bin]]
 name = "kernel_first_test"
-path = "src/tests/first_test.rs"
+path = "src/memory/tests/first_test.rs"
 required-features = ["guest_kernel"]
 
 [[bin]]
 name = "kernel_mem_alloc_test"
-path = "src/tests/mem_alloc_test.rs"
+path = "src/memory/tests/mem_alloc_test.rs"
 required-features = ["guest_kernel"]
 
 [[bin]]
 name = "kernel_mem_map_test"
-path = "src/tests/mem_map_test.rs"
+path = "src/memory/tests/mem_map_test.rs"
 required-features = ["guest_kernel"]
 
 [[bin]]
 name = "kernel_mem_map_edge_test"
-path = "src/tests/mem_map_edge_test.rs"
+path = "src/memory/tests/mem_map_edge_test.rs"
 required-features = ["guest_kernel"]
 
 [[bin]]
 name = "kernel_page_alloc_test"
-path = "src/tests/page_alloc_test.rs"
+path = "src/memory/tests/page_alloc_test.rs"
 required-features = ["guest_kernel"]
 
 [[bin]]
 name = "kernel_heap_edge_test"
-path = "src/tests/heap_edge_test.rs"
+path = "src/memory/tests/heap_edge_test.rs"
 required-features = ["guest_kernel"]
