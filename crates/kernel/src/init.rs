@@ -41,7 +41,7 @@ fn init_state(state_ptr: *const u8, state_len: usize) {
     }
 }
 
-fn init_boot_info(boot_info: Option<&BootInfo>) -> Option<&BootInfo> {
+pub(crate) fn init_boot_info(boot_info: Option<&BootInfo>) -> Option<&BootInfo> {
     logf!(
         "init_boot_info: boot_info_ptr=0x%x",
         boot_info

@@ -3,17 +3,27 @@
 # Nightly cargo for avm32 builds (used for kernel ELF and examples).
 CARGO_NIGHTLY ?= cargo +nightly-aarch64-apple-darwin
 AVM32 := $(CARGO_NIGHTLY) run -p compiler --bin avm32 --
+KERNEL_MANIFEST := crates/kernel/Cargo.toml
+KERNEL_OUT_DIR := crates/bootloader/bin
+KERNEL_BINS := $(shell awk '/\[\[bin\]\]/{inbin=1;next} inbin && /name =/{gsub(/"/,"",$$3); print $$3; inbin=0}' $(KERNEL_MANIFEST))
+KERNEL_TEST_BINS := $(filter-out kernel,$(KERNEL_BINS))
 
 all: clean program examples test utils summary
 
 .PHONY: run_examples
+.PHONY: kernel
+
+kernel:
+	@echo "=== Building kernel ELF ==="
+	@mkdir -p $(KERNEL_OUT_DIR)
+	@$(AVM32) all --bin kernel --manifest-path $(KERNEL_MANIFEST) --features guest_kernel --out-dir $(KERNEL_OUT_DIR) --src crates/kernel/src/main.rs
+	@echo "=== Building kernel test ELFs ==="
+	@$(foreach bin,$(KERNEL_TEST_BINS),$(AVM32) all --bin $(bin) --manifest-path $(KERNEL_MANIFEST) --features guest_kernel --out-dir $(KERNEL_OUT_DIR) --src crates/kernel/src/tests/$(patsubst kernel_%,%,$(bin)).rs;)
 
 run_examples:
 	@echo "=== Building example programs ==="
 	RUSTFLAGS="-Awarnings" $(MAKE) -C crates/examples
-	@echo "=== Building kernel ELF ==="
-	@mkdir -p crates/bootloader/bin
-	@$(AVM32) all --bin kernel --manifest-path crates/kernel/Cargo.toml --features guest_kernel --out-dir crates/bootloader/bin --src crates/kernel/src/main.rs
+	@$(MAKE) kernel
 	@echo "=== Running example crate tests ==="
 	cd crates/examples && RUSTFLAGS="-Awarnings" KERNEL_ELF="../bootloader/bin/kernel.elf" cargo test --test examples_test -- --nocapture
 	@echo "=== Example programs build and tests complete ==="

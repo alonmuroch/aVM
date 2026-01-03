@@ -19,3 +19,12 @@ state = { path = "../state" }
 name = "kernel"
 path = "src/main.rs"
 required-features = ["guest_kernel"]
+
+#####################
+#    Kernel Tests
+#####################
+
+[[bin]]
+name = "kernel_first_test"
+path = "src/tests/first_test.rs"
+required-features = ["guest_kernel"]
