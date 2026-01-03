@@ -57,10 +57,7 @@ pub fn prep_program_task(
             root_ppn
         );
     }
-    let perms = mmu::PagePerms::user_rwx();
-    if !mmu::map_range_for_root(root_ppn, PROGRAM_VA_BASE, PROGRAM_WINDOW_BYTES, perms) {
-        panic!("launch_program: mapping failed (root=0x{:x})", root_ppn);
-    }
+    map_program_window(root_ppn, code.len());
 
     // Copy the full program image starting at VA 0 so section offsets (e.g. .text at 0x400)
     // land where the ELF expected them. Entry offset is provided by the caller.
@@ -155,4 +152,42 @@ pub fn prep_program_task(
     );
 
     Some(task)
+}
+
+fn align_up(value: usize, align: usize) -> usize {
+    if align == 0 {
+        return value;
+    }
+    (value + (align - 1)) & !(align - 1)
+}
+
+/// Map the program window so code pages are RX and data/stack/heap are RW.
+/// The first page stays RWX because the program writes its result at 0x100.
+fn map_program_window(root_ppn: u32, code_len: usize) {
+    let code_len = align_up(code_len, SV32_PAGE_SIZE);
+    if code_len > PROGRAM_WINDOW_BYTES {
+        panic!("launch_program: code window exceeds program window");
+    }
+    let first_page_len = core::cmp::min(code_len, SV32_PAGE_SIZE);
+    let first_page_perms = mmu::PagePerms::user_rwx();
+    // Page 0 hosts the result header at 0x100, so keep it writable.
+    if !mmu::map_range_for_root(root_ppn, PROGRAM_VA_BASE, first_page_len, first_page_perms) {
+        panic!("launch_program: first page mapping failed (root=0x{:x})", root_ppn);
+    }
+    if code_len > SV32_PAGE_SIZE {
+        let code_perms = mmu::PagePerms::new(true, false, true, true);
+        let code_start = PROGRAM_VA_BASE.wrapping_add(SV32_PAGE_SIZE as u32);
+        let code_rest = code_len.saturating_sub(SV32_PAGE_SIZE);
+        // Remaining code pages are RX-only to protect program text.
+        if !mmu::map_range_for_root(root_ppn, code_start, code_rest, code_perms) {
+            panic!("launch_program: code mapping failed (root=0x{:x})", root_ppn);
+        }
+    }
+    let data_start = PROGRAM_VA_BASE.wrapping_add(code_len as u32);
+    let data_len = PROGRAM_WINDOW_BYTES.saturating_sub(code_len);
+    let data_perms = mmu::PagePerms::new(true, true, false, true);
+    // Data/stack/heap region is RW, non-exec.
+    if !mmu::map_range_for_root(root_ppn, data_start, data_len, data_perms) {
+        panic!("launch_program: data mapping failed (root=0x{:x})", root_ppn);
+    }
 }
