@@ -58,6 +58,30 @@ Demonstrates how one contract can call another contract.
 - **Features**: External contract calls, result handling
 - **Use cases**: DeFi protocols, modular contract systems
 
+### 8. **logging.rs** - Logging and Tracing
+Emits structured logs from inside the VM.
+- **Purpose**: Show runtime logging patterns
+- **Features**: Kernel log output, string formatting
+- **Use cases**: Debugging contract behavior
+
+### 9. **native_transfer.rs** - Native Transfer Syscall
+Uses the transfer syscall from a guest program.
+- **Purpose**: Demonstrate native token transfers
+- **Features**: Syscall usage, parameter encoding
+- **Use cases**: Simple payments, account funding
+
+### 10. **dex.rs** - Simple AMM
+Implements a basic AMM between native AM and an ERC-20 token.
+- **Purpose**: Show multi-contract interactions and liquidity flows
+- **Features**: Add/remove liquidity, swaps
+- **Use cases**: DeFi primitives
+
+### 11. **ecdsa_verify.rs** - Signature Verification
+Verifies an ECDSA signature inside the VM.
+- **Purpose**: Demonstrate cryptographic verification
+- **Features**: Signature parsing, hashing, verification
+- **Use cases**: Auth, permit-style flows
+
 ## Project Structure
 
 ```
@@ -67,7 +91,6 @@ examples/
 │   ├── *.elf           # RISC-V ELF binaries
 │   ├── *.abi.json      # Contract ABI definitions
 │   └── *_client.rs     # Auto-generated client code
-├── tests/              # Integration tests
 ├── Makefile            # Build system
 ├── Cargo.toml          # Rust dependencies
 └── generate_abis.sh    # ABI generation script
@@ -75,9 +98,9 @@ examples/
 
 ## Running Tests
 
-To run the integration tests for all examples:
+Example integration tests run through the `aTester` crate in the workspace:
 ```bash
-cargo test
+make run_examples
 ```
 
 ## Key Concepts Demonstrated

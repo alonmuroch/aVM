@@ -8,7 +8,6 @@ edition = "2021"
 
 [dependencies]
 state = { path = "../state" }  # adjust path as needed
-storage = { path = "../storage" }  # adjust path as needed
 types = { path = "../types" }  # adjust path as needed
 
 [features]

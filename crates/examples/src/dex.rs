@@ -1,14 +1,14 @@
 #![no_std]
 #![no_main]
 
-extern crate program;
+extern crate clibc;
 
-use program::{
+use clibc::{
+    DataParser, Map,
     call::call,
-    entrypoint, event, fire_event, persist_struct, DataParser, require, vm_panic, transfer,
-    hex_address,
+    entrypoint, event, fire_event, hex_address, persist_struct, require, transfer,
     types::{address::Address, o::O, result::Result},
-    Map,
+    vm_panic,
 };
 
 // Generated ABI client for ERC20 (included like in call_program example)
@@ -52,8 +52,8 @@ const ADD_LIQUIDITY: u8 = 0x01;
 const REMOVE_LIQUIDITY: u8 = 0x02;
 const SWAP: u8 = 0x03;
 
-fn load_pool() -> Pool {
-    match Pool::load() {
+fn load_pool(program: &Address) -> Pool {
+    match Pool::load(program) {
         O::Some(p) => p,
         O::None => Pool {
             reserve_am: 0,
@@ -63,14 +63,14 @@ fn load_pool() -> Pool {
     }
 }
 
-fn get_liquidity(owner: Address) -> u128 {
-    match Liquidity::get(owner) {
+fn get_liquidity(program: &Address, owner: Address) -> u128 {
+    match Liquidity::get(program, owner) {
         O::Some(v) => v,
         O::None => 0,
     }
 }
 
-fn add_liquidity(self_addr: Address, caller: Address, mut parser: DataParser) -> Result {
+fn add_liquidity(program: Address, caller: Address, mut parser: DataParser) -> Result {
     // Adds liquidity by pulling both legs (native AM and ERC20) from the caller,
     // mints LP shares proportional to the existing reserves, and emits an event.
     let erc20 = Erc20Contract::new(erc20_address());
@@ -82,16 +82,16 @@ fn add_liquidity(self_addr: Address, caller: Address, mut parser: DataParser) ->
     require(token_in <= u32::MAX as u128, b"add: token overflow");
 
     // Collect AM from caller into the pool address (native balance increases).
-    require(transfer!(&self_addr, am_in), b"add: am transfer failed");
+    require(transfer!(&program, am_in), b"add: am transfer failed");
 
     // Pull ERC20 from caller into the pool address.
     let ok = erc20
-        .transfer(&caller, self_addr, token_in as u32)
+        .transfer_from(&program, caller, program, token_in as u32)
         .map(|r| r.success)
         .unwrap_or(false);
     require(ok, b"add: token transfer failed");
 
-    let mut pool = load_pool();
+    let mut pool = load_pool(&program);
 
     let minted = if pool.total_liquidity == 0 {
         am_in as u128
@@ -107,10 +107,10 @@ fn add_liquidity(self_addr: Address, caller: Address, mut parser: DataParser) ->
     pool.reserve_am = pool.reserve_am.saturating_add(am_in as u128);
     pool.reserve_token = pool.reserve_token.saturating_add(token_in);
     pool.total_liquidity = pool.total_liquidity.saturating_add(minted);
-    pool.store();
+    pool.store(&program);
 
-    let user_liq = get_liquidity(caller).saturating_add(minted);
-    Liquidity::set(caller, user_liq);
+    let user_liq = get_liquidity(&program, caller).saturating_add(minted);
+    Liquidity::set(&program, caller, user_liq);
 
     if token_in <= u64::MAX as u128 {
         fire_event!(LiquidityAdded::new(caller, am_in, token_in as u64));
@@ -121,15 +121,15 @@ fn add_liquidity(self_addr: Address, caller: Address, mut parser: DataParser) ->
     res
 }
 
-fn remove_liquidity(self_addr: Address, caller: Address, mut parser: DataParser) -> Result {
+fn remove_liquidity(program: Address, caller: Address, mut parser: DataParser) -> Result {
     // Burns LP shares for AM + ERC20 payouts, updates reserves, and emits LiquidityRemoved.
     let erc20 = Erc20Contract::new(erc20_address());
     require(parser.remaining() >= 8, b"remove: missing args");
     let shares = parser.read_u64() as u128;
     require(shares > 0, b"remove: zero shares");
 
-    let mut pool = load_pool();
-    let user_shares = get_liquidity(caller);
+    let mut pool = load_pool(&program);
+    let user_shares = get_liquidity(&program, caller);
     require(user_shares >= shares, b"remove: not enough shares");
     require(pool.total_liquidity > 0, b"remove: empty pool");
 
@@ -141,23 +141,30 @@ fn remove_liquidity(self_addr: Address, caller: Address, mut parser: DataParser)
     pool.reserve_am = pool.reserve_am.saturating_sub(am_out);
     pool.reserve_token = pool.reserve_token.saturating_sub(token_out);
     pool.total_liquidity = pool.total_liquidity.saturating_sub(shares);
-    pool.store();
+    pool.store(&program);
 
-    Liquidity::set(caller, user_shares - shares);
+    Liquidity::set(&program, caller, user_shares - shares);
 
     // Pay out ERC20 tokens from pool balance.
     require(token_out <= u32::MAX as u128, b"remove: token overflow");
     let ok = erc20
-        .transfer(&self_addr, caller, token_out as u32)
+        .transfer(&program, caller, token_out as u32)
         .map(|r| r.success)
         .unwrap_or(false);
     require(ok, b"remove: token transfer failed");
 
     // Pay native AM out to the provider. Note: with the current host interface,
     // native transfers debit the caller context.
-    require(transfer!(&caller, am_out as u64), b"remove: am transfer failed");
+    require(
+        transfer!(&caller, am_out as u64),
+        b"remove: am transfer failed",
+    );
 
-    fire_event!(LiquidityRemoved::new(caller, am_out as u64, token_out as u64));
+    fire_event!(LiquidityRemoved::new(
+        caller,
+        am_out as u64,
+        token_out as u64
+    ));
 
     // AM payouts are reported in the result for visibility.
     let mut res = Result::new(true, 0);
@@ -168,7 +175,7 @@ fn remove_liquidity(self_addr: Address, caller: Address, mut parser: DataParser)
     res
 }
 
-fn swap(self_addr: Address, caller: Address, mut parser: DataParser) -> Result {
+fn swap(program: Address, caller: Address, mut parser: DataParser) -> Result {
     // Constant-product swap. Direction 0 = AM -> ERC20, Direction 1 = ERC20 -> AM.
     let erc20 = Erc20Contract::new(erc20_address());
     require(parser.remaining() >= 9, b"swap: missing args");
@@ -176,26 +183,32 @@ fn swap(self_addr: Address, caller: Address, mut parser: DataParser) -> Result {
     let amount = parser.read_u64();
     require(amount > 0, b"swap: zero amount");
 
-    let mut pool = load_pool();
-    require(pool.reserve_am > 0 && pool.reserve_token > 0, b"swap: empty pool");
+    let mut pool = load_pool(&program);
+    require(
+        pool.reserve_am > 0 && pool.reserve_token > 0,
+        b"swap: empty pool",
+    );
 
     if direction == 0 {
         let am_in = amount;
         // Collect AM into the pool.
-        let ok = transfer!(&self_addr, am_in);
+        let ok = transfer!(&program, am_in);
         require(ok, b"swap: am transfer failed");
 
         let token_out = (am_in as u128 * pool.reserve_token) / (pool.reserve_am + am_in as u128);
         require(token_out > 0, b"swap: zero output");
-        require(token_out <= pool.reserve_token, b"swap: insufficient tokens");
+        require(
+            token_out <= pool.reserve_token,
+            b"swap: insufficient tokens",
+        );
         require(token_out <= u32::MAX as u128, b"swap: token overflow");
 
         pool.reserve_am = pool.reserve_am.saturating_add(am_in as u128);
         pool.reserve_token = pool.reserve_token.saturating_sub(token_out);
-        pool.store();
+        pool.store(&program);
 
         let ok = erc20
-            .transfer(&self_addr, caller, token_out as u32)
+            .transfer(&program, caller, token_out as u32)
             .map(|r| r.success)
             .unwrap_or(false);
         require(ok, b"swap: token transfer failed");
@@ -212,7 +225,7 @@ fn swap(self_addr: Address, caller: Address, mut parser: DataParser) -> Result {
 
         // Pull ERC20 into the pool.
         let ok = erc20
-            .transfer(&caller, self_addr, token_in as u32)
+            .transfer_from(&program, caller, program, token_in as u32)
             .map(|r| r.success)
             .unwrap_or(false);
         require(ok, b"swap: token transfer failed");
@@ -224,7 +237,7 @@ fn swap(self_addr: Address, caller: Address, mut parser: DataParser) -> Result {
 
         pool.reserve_token = pool.reserve_token.saturating_add(token_in);
         pool.reserve_am = pool.reserve_am.saturating_sub(am_out);
-        pool.store();
+        pool.store(&program);
 
         // Pay native AM to the trader and leave ERC20 in the pool.
         require(transfer!(&caller, am_out as u64), b"swap: am payout failed");
@@ -237,7 +250,7 @@ fn swap(self_addr: Address, caller: Address, mut parser: DataParser) -> Result {
     }
 }
 
-fn dex_entry(self_addr: Address, caller: Address, data: &[u8]) -> Result {
+fn dex_entry(program: Address, caller: Address, data: &[u8]) -> Result {
     // Simple selector-based router: first byte is op, remainder is args for the op handlers.
     if data.is_empty() {
         vm_panic(b"missing selector");
@@ -247,9 +260,9 @@ fn dex_entry(self_addr: Address, caller: Address, data: &[u8]) -> Result {
     let op = parser.read_bytes(1)[0];
 
     match op {
-        ADD_LIQUIDITY => add_liquidity(self_addr, caller, parser),
-        REMOVE_LIQUIDITY => remove_liquidity(self_addr, caller, parser),
-        SWAP => swap(self_addr, caller, parser),
+        ADD_LIQUIDITY => add_liquidity(program, caller, parser),
+        REMOVE_LIQUIDITY => remove_liquidity(program, caller, parser),
+        SWAP => swap(program, caller, parser),
         _ => vm_panic(b"unknown selector"),
     }
 }

@@ -1,4 +1,5 @@
 use goblin::elf::Elf;
+use goblin::elf::section_header::SHT_NOBITS;
 
 pub struct ElfInfo<'a> {
     pub code: &'a [u8],
@@ -68,6 +69,29 @@ impl<'a> ElfInfo<'a> {
     pub fn get_section_by_name(&self, name: &str) -> Option<&ElfSection<'a>> {
         self.sections.iter().find(|s| s.name == name)
     }
+
+    /// Returns a flat `.bss` range (length is zeroed by loader), and base address.
+    pub fn get_flat_bss(&self) -> Option<(Vec<u8>, u64)> {
+        let bss_sections: Vec<&ElfSection> = self
+            .sections
+            .iter()
+            .filter(|s| s.name.starts_with(".bss") || s.name.starts_with(".sbss"))
+            .collect();
+
+        if bss_sections.is_empty() {
+            return None;
+        }
+
+        let min_addr = bss_sections.iter().map(|s| s.addr).min().unwrap();
+        let max_addr = bss_sections
+            .iter()
+            .map(|s| s.addr + s.size)
+            .max()
+            .unwrap();
+
+        let total_size = (max_addr - min_addr) as usize;
+        Some((vec![0u8; total_size], min_addr))
+    }
 }
 
 
@@ -80,8 +104,13 @@ pub fn parse_elf_from_bytes<'a>(bytes: &'a [u8]) -> Result<ElfInfo<'a>, goblin::
             let offset = section.sh_offset as usize;
             let size = section.sh_size as usize;
 
-            if offset + size <= bytes.len() {
-                let data = &bytes[offset..offset + size];
+            let is_nobits = section.sh_type == SHT_NOBITS;
+            if offset + size <= bytes.len() || is_nobits {
+                let data = if is_nobits {
+                    &bytes[0..0]
+                } else {
+                    &bytes[offset..offset + size]
+                };
                 sections.push(ElfSection {
                     name: name.to_string(),
                     addr: section.sh_addr,

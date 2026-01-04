@@ -2,7 +2,9 @@ use core::fmt;
 use crate::O;
 use crate::SerializeField;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub const ADDRESS_LEN: usize = 20;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(C)]
 pub struct Address(pub [u8; 20]);
 

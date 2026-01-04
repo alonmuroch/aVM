@@ -1,15 +1,42 @@
-use crate::decoder::{decode_full, decode_compressed};
+use crate::decoder::{decode_compressed, decode_full};
 use crate::instruction::Instruction;
-use crate::memory_page::MemoryPage;
-use storage::Storage;
-use std::rc::Rc;
+use crate::memory::{Memory, VirtualAddress};
+use crate::metering::{MemoryAccessKind, MeterResult, Metering, NoopMeter};
 use core::cell::RefCell;
-use crate::host_interface::HostInterface;
-use crate::sys_call::SyscallHandler;
-use crate::registers::Register;
 use core::fmt::Write;
 use std::collections::HashMap;
-use crate::instruction::CsrOp;
+use std::rc::Rc;
+#[path = "exe.rs"]
+mod exec;
+
+pub const CSR_SATP: u16 = 0x180;
+pub const CSR_SSTATUS: u16 = 0x100;
+pub const CSR_STVEC: u16 = 0x105;
+pub const CSR_SEPC: u16 = 0x141;
+pub const CSR_SCAUSE: u16 = 0x142;
+pub const CSR_STVAL: u16 = 0x143;
+pub const CSR_MEPC: u16 = 0x341;
+pub const CSR_MTVEC: u16 = 0x305;
+pub const CSR_MCAUSE: u16 = 0x342;
+pub const CSR_MTVAL: u16 = 0x343;
+const SCAUSE_ECALL_FROM_U: u32 = 8;
+const SCAUSE_ECALL_FROM_S: u32 = 9;
+const SCAUSE_ECALL_FROM_M: u32 = 11;
+const SCAUSE_BREAKPOINT: u32 = 3;
+const SSTATUS_SPP: u32 = 1 << 8;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PrivilegeMode {
+    User,
+    Supervisor,
+    Machine,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TrapMode {
+    Supervisor,
+    Machine,
+}
 
 /// Represents the Central Processing Unit (CPU) of our RISC-V virtual machine.
 /// 
@@ -36,11 +63,10 @@ use crate::instruction::CsrOp;
 /// This allows us to run programs written for one architecture (RISC-V) on
 /// different hardware (like x86 or ARM). The VM provides an abstraction layer
 /// that makes the underlying hardware details transparent to the running program.
-/// 
-/// MEMORY MANAGEMENT: We use Rc<RefCell<>> for shared mutable access to memory
-/// and storage, which allows the CPU to read/write memory while maintaining
-/// Rust's safety guarantees.
-/// 
+///
+/// MEMORY MANAGEMENT: We use Rc-backed trait objects for shared memory, which
+/// allows the CPU to read/write memory while maintaining Rust's safety guarantees.
+///
 /// PERFORMANCE CONSIDERATIONS: This is an interpretive VM, meaning each
 /// instruction is decoded and executed one at a time. Real CPUs use techniques
 /// like pipelining, out-of-order execution, and just-in-time compilation to
@@ -62,19 +88,23 @@ pub struct CPU {
     /// EDUCATIONAL: This helps students understand what the CPU is doing
     /// by printing each instruction as it executes
     pub verbose: bool,
-    pub syscall_handler: Box<dyn SyscallHandler>,
-    
     /// Reservation address for LR/SC atomic operations
     /// EDUCATIONAL: This implements the Load-Reserved/Store-Conditional
     /// mechanism for atomic memory operations in RISC-V
-    pub reservation_addr: Option<usize>,
+    pub reservation_addr: Option<VirtualAddress>,
     
     /// Optional writer for verbose output
     /// If None, uses println! to console
     pub verbose_writer: Option<Rc<RefCell<dyn Write>>>,
 
+    /// Pluggable metering implementation (gas, resource accounting, etc.)
+    pub metering: Box<dyn Metering>,
+
     /// Minimal CSR storage for CSR instructions
     pub csrs: HashMap<u16, u32>,
+
+    /// Current privilege mode (minimal U/S support).
+    pub priv_mode: PrivilegeMode,
 }
 
 impl std::fmt::Debug for CPU {
@@ -84,7 +114,11 @@ impl std::fmt::Debug for CPU {
             .field("regs", &self.regs)
             .field("verbose", &self.verbose)
             .field("reservation_addr", &self.reservation_addr)
-            .field("verbose_writer", &self.verbose_writer.as_ref().map(|_| "Some(<writer>)"))
+            .field(
+                "verbose_writer",
+                &self.verbose_writer.as_ref().map(|_| "Some(<writer>)"),
+            )
+            .field("metering", &"<dyn Metering>")
             .finish()
     }
 }
@@ -99,21 +133,34 @@ impl CPU {
     /// - PC starts at 0 (first instruction)
     /// - All registers start at 0 (except x0 which is always 0)
     /// - Verbose logging is disabled by default
-    pub fn new(syscall_handler: Box<dyn SyscallHandler>) -> Self {
+    pub fn new() -> Self {
+        Self::with_metering(Box::new(NoopMeter::default()))
+    }
+
+    /// Creates a new CPU instance with a custom metering implementation.
+    pub fn with_metering(
+        metering: Box<dyn Metering>,
+    ) -> Self {
         Self {
             pc: 0,
             regs: [0; 32],
             verbose: false,
-            syscall_handler,
             reservation_addr: None,
             verbose_writer: None,
+            metering,
             csrs: HashMap::new(),
+            priv_mode: PrivilegeMode::Supervisor,
         }
     }
     
     /// Sets a writer for verbose output
     pub fn set_verbose_writer(&mut self, writer: Rc<RefCell<dyn Write>>) {
         self.verbose_writer = Some(writer);
+    }
+
+    /// Swap in a new metering implementation.
+    pub fn set_metering(&mut self, metering: Box<dyn Metering>) {
+        self.metering = metering;
     }
     
     /// Helper method to log output
@@ -134,19 +181,135 @@ impl CPU {
         }
     }
 
-    fn read_csr(&self, csr: u16) -> u32 {
+    fn can_continue(result: MeterResult) -> bool {
+        matches!(result, MeterResult::Continue)
+    }
+
+    fn read_csr(&mut self, csr: u16) -> Option<u32> {
+        if !Self::can_continue(self.metering.on_pc_update(self.pc, self.pc)) {
+            return None;
+        }
         // Provide simple defaults for common CSRs; fall back to stored values or zero.
-        match csr {
+        Some(match csr {
             0xF14 => *self.csrs.get(&csr).unwrap_or(&0), // mhartid
             0xF11 | 0xF12 | 0xF13 => *self.csrs.get(&csr).unwrap_or(&0), // mvendorid/marchid/mimpid
             0x301 => *self.csrs.get(&csr).unwrap_or(&0), // misa
             0x300 => *self.csrs.get(&csr).unwrap_or(&0), // mstatus
+            CSR_SSTATUS => *self.csrs.get(&csr).unwrap_or(&0),
             _ => *self.csrs.get(&csr).unwrap_or(&0),
+        })
+    }
+
+    fn write_csr(&mut self, csr: u16, value: u32) -> bool {
+        if !Self::can_continue(self.metering.on_pc_update(self.pc, self.pc)) {
+            return false;
+        }
+        self.csrs.insert(csr, value);
+        true
+    }
+
+    pub fn set_satp(&mut self, memory: &Memory, value: u32) -> bool {
+        memory.set_satp(value);
+        self.write_csr(CSR_SATP, value)
+    }
+
+    fn set_sstatus_spp(&mut self, prev: PrivilegeMode) {
+        let mut sstatus = self.read_csr(CSR_SSTATUS).unwrap_or(0);
+        match prev {
+            PrivilegeMode::User => sstatus &= !SSTATUS_SPP,
+            PrivilegeMode::Supervisor => sstatus |= SSTATUS_SPP,
+            PrivilegeMode::Machine => sstatus |= SSTATUS_SPP,
+        }
+        let _ = self.write_csr(CSR_SSTATUS, sstatus);
+    }
+
+    fn take_sstatus_spp(&mut self) -> PrivilegeMode {
+        let mut sstatus = self.read_csr(CSR_SSTATUS).unwrap_or(0);
+        let prev = if sstatus & SSTATUS_SPP != 0 {
+            PrivilegeMode::Supervisor
+        } else {
+            PrivilegeMode::User
+        };
+        sstatus &= !SSTATUS_SPP;
+        let _ = self.write_csr(CSR_SSTATUS, sstatus);
+        prev
+    }
+
+    fn ecall_cause(&self) -> u32 {
+        match self.priv_mode {
+            PrivilegeMode::User => SCAUSE_ECALL_FROM_U,
+            PrivilegeMode::Supervisor => SCAUSE_ECALL_FROM_S,
+            PrivilegeMode::Machine => SCAUSE_ECALL_FROM_M,
         }
     }
 
-    fn write_csr(&mut self, csr: u16, value: u32) {
-        self.csrs.insert(csr, value);
+    fn trap_to_vector(
+        &mut self,
+        mode: TrapMode,
+        cause: u32,
+        trap_value: u32,
+        _syscall_id: Option<u32>,
+    ) -> bool {
+        match mode {
+            TrapMode::Machine => {
+                if !self.write_csr(CSR_MEPC, self.pc) {
+                    panic!("trap_to_vector: failed to write mepc");
+                }
+                if !self.write_csr(CSR_MCAUSE, cause) {
+                    panic!("trap_to_vector: failed to write mcause");
+                }
+                if !self.write_csr(CSR_MTVAL, trap_value) {
+                    panic!("trap_to_vector: failed to write mtval");
+                }
+                let mtvec = match self.read_csr(CSR_MTVEC) {
+                    Some(val) => val & !0x3,
+                    None => return false,
+                };
+                self.priv_mode = PrivilegeMode::Machine;
+                self.set_pc(mtvec)
+            }
+            TrapMode::Supervisor => {
+                if !self.write_csr(CSR_SEPC, self.pc) {
+                    panic!("trap_to_vector: failed to write sepc");
+                }
+                if !self.write_csr(CSR_SCAUSE, cause) {
+                    panic!("trap_to_vector: failed to write scause");
+                }
+                if !self.write_csr(CSR_STVAL, trap_value) {
+                    panic!("trap_to_vector: failed to write stval");
+                }
+                let stvec = match self.read_csr(CSR_STVEC) {
+                    Some(val) => val & !0x3,
+                    None => return false,
+                };
+                self.set_sstatus_spp(self.priv_mode);
+                self.priv_mode = PrivilegeMode::Supervisor;
+                self.set_pc(stvec)
+            }
+        }
+    }
+
+    fn has_trap_vector(&self) -> Option<TrapMode> {
+        match self.priv_mode {
+            PrivilegeMode::Machine => {
+                if self.csrs.contains_key(&CSR_MTVEC) {
+                    Some(TrapMode::Machine)
+                } else if self.csrs.contains_key(&CSR_STVEC) {
+                    Some(TrapMode::Supervisor)
+                } else {
+                    None
+                }
+            }
+            PrivilegeMode::Supervisor | PrivilegeMode::User => {
+                if self.csrs.contains_key(&CSR_STVEC) {
+                    Some(TrapMode::Supervisor)
+                } else if self.csrs.contains_key(&CSR_MTVEC) {
+                    Some(TrapMode::Machine)
+                } else {
+                    None
+                }
+            }
+        }
     }
 
     /// Executes a single instruction cycle (fetch, decode, execute).
@@ -171,19 +334,14 @@ impl CPU {
     /// 
     /// RETURN VALUE: Returns true if execution should continue, false to halt
     /// 
-    /// MEMORY ACCESS: Uses shared references to memory and storage to allow
+    /// MEMORY ACCESS: Uses shared references to memory to allow
     /// the CPU to read/write while maintaining Rust's safety guarantees.
     /// 
     /// REAL-WORLD ANALOGY: This is like a factory assembly line where each
     /// worker (instruction) performs a specific task. The conveyor belt (PC)
     /// moves to the next task automatically, unless a task specifically
     /// redirects the flow (like a branch or jump instruction).
-    pub fn step(
-        &mut self,
-        memory: Rc<RefCell<MemoryPage>>,
-        storage: Rc<RefCell<Storage>>,
-        host: &mut Box<dyn HostInterface>,
-    ) -> bool {
+    pub fn step(&mut self, memory: Memory) -> bool {
         // EDUCATIONAL: Step 1 - Fetch and decode the next instruction
         let instr = self.next_instruction(Rc::clone(&memory));
         
@@ -191,11 +349,11 @@ impl CPU {
         match instr {
             Some((instr, size)) => {
                 // Valid instruction found - execute it
-                self.run_instruction(instr, size, Rc::clone(&memory), storage, host)
+                self.run_instruction(instr, size, Rc::clone(&memory))
             }
             None => {
                 // No valid instruction found - handle the error
-                self.unknown_instruction(Rc::clone(&memory), storage)
+                self.unknown_instruction(Rc::clone(&memory))
             }
         }
     }
@@ -213,60 +371,92 @@ impl CPU {
     /// - instr: The decoded instruction to execute
     /// - size: Size of the instruction in bytes (2 for compressed, 4 for full)
     /// - memory: Shared reference to memory for load/store operations
-    /// - storage: Shared reference to persistent storage
     fn run_instruction(
-        &mut self, 
-        instr: Instruction, 
-        size: u8, 
-        memory: Rc<RefCell<MemoryPage>>, 
-        storage: Rc<RefCell<Storage>>,
-        host: &mut Box<dyn HostInterface>) -> bool {
+        &mut self,
+        instr: Instruction,
+        size: u8,
+        memory: Memory,
+    ) -> bool {
         // EDUCATIONAL: Debug output to help understand what's happening
         // Get the actual instruction bytes for debugging
-        if let Some(bytes) = memory.borrow().mem_slice(self.pc as usize, self.pc as usize + size as usize) {
-            let hex_bytes = bytes.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ");
-            self.log(&format!("PC = 0x{:08x}, Bytes = [{}], Instr = {}", self.pc, hex_bytes, instr.pretty_print()), true);
+        let pc_va = VirtualAddress(self.pc);
+        let end_va = VirtualAddress(self.pc.wrapping_add(size as u32));
+        if let Some(bytes) = memory.mem_slice(pc_va, end_va) {
+            let hex_bytes = bytes
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join(" ");
+            self.log(
+                &format!(
+                    "PC = 0x{:08x}, Bytes = [{}], Instr = {}",
+                    self.pc,
+                    hex_bytes,
+                    instr.pretty_print()
+                ),
+                true,
+            );
         } else {
-            self.log(&format!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print()), true);
+            self.log(
+                &format!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print()),
+                true,
+            );
         }
-        
+
+        if !Self::can_continue(self.metering.on_instruction(self.pc, &instr, size)) {
+            return false;
+        }
+
         // EDUCATIONAL: Remember the old PC to detect if the instruction changed it
         let old_pc = self.pc;
-        
+
         // EDUCATIONAL: Execute the instruction
-        let result = self.execute(instr, memory, storage, host);      
+        let result = self.execute(instr.clone(), memory);
+        if !result {
+            self.log(
+                &format!(
+                    "Execution halted at PC=0x{:08x} on instr={}",
+                    self.pc,
+                    instr.pretty_print()
+                ),
+                false,
+            );
+        }
 
         // EDUCATIONAL: Only increment PC if the instruction didn't change it
         // This handles branches, jumps, and calls correctly
         if self.pc == old_pc {
-            self.pc = self.pc.wrapping_add(size as u32);
+            if !self.pc_add(size as u32) {
+                return false;
+            }
         }
         result
     }
 
     /// Handles unknown or invalid instructions.
-    /// 
+    ///
     /// EDUCATIONAL PURPOSE: This demonstrates error handling in CPU design.
     /// When a CPU encounters an invalid instruction, it needs to handle it
     /// gracefully rather than crashing.
-    /// 
+    ///
     /// DEBUGGING: This function provides detailed information about what
     /// went wrong, including the hex dump of the invalid bytes.
-    /// 
+    ///
     /// RETURN VALUE: Returns false to halt execution on invalid instructions
-    fn unknown_instruction(&mut self, memory: Rc<RefCell<MemoryPage>>, _storage: Rc<RefCell<Storage>>) -> bool {
+    fn unknown_instruction(&mut self, memory: Memory) -> bool {
         // EDUCATIONAL: Try to read the invalid instruction bytes for debugging
-        if let Some(slice_ref) = memory.borrow().mem_slice(self.pc as usize, self.pc as usize + 4) {
+        if let Some(slice_ref) = memory.mem_slice(VirtualAddress(self.pc), VirtualAddress(self.pc.wrapping_add(4)))
+        {
             // EDUCATIONAL: Convert bytes to hex for human-readable debugging
-            let hex_dump = slice_ref.iter()
+            let hex_dump = slice_ref
+                .iter()
                 .map(|b| format!("{:02x}", b)) // still needs deref
                 .collect::<Vec<_>>()
                 .join(" ");
 
             panic!(
                 "🚨 Unknown or invalid instruction at PC = 0x{:08x} (bytes: [{}])",
-                self.pc,
-                hex_dump
+                self.pc, hex_dump
             );
         } else {
             panic!(
@@ -278,22 +468,21 @@ impl CPU {
     }
 
     /// Fetches and decodes the next instruction from memory.
-    /// 
+    ///
     /// EDUCATIONAL PURPOSE: This demonstrates the fetch and decode phases
     /// of the instruction cycle. It handles both regular (32-bit) and
     /// compressed (16-bit) RISC-V instructions.
-    /// 
+    ///
     /// RISC-V COMPRESSED INSTRUCTIONS: RISC-V supports 16-bit compressed
     /// instructions to reduce code size. The bottom 2 bits determine if
     /// an instruction is compressed (not 0b11) or regular (0b11).
-    /// 
+    ///
     /// RETURN VALUE: Returns Some((instruction, size)) if successful, None if invalid
-    pub fn next_instruction(&mut self, memory: Rc<RefCell<MemoryPage>>) -> Option<(Instruction, u8)> {
-        let pc = self.pc as usize;
-        let mem_ref = memory.borrow();
-        
+    pub fn next_instruction(&mut self, memory: Memory) -> Option<(Instruction, u8)> {
+        let pc = VirtualAddress(self.pc);
+
         // EDUCATIONAL: Read 4 bytes from memory (enough for any instruction)
-        let bytes = mem_ref.mem_slice(pc, pc + 4)?;
+        let bytes = memory.mem_slice(pc, VirtualAddress(self.pc.wrapping_add(4)))?;
 
         // EDUCATIONAL: Need at least 2 bytes for any instruction
         if bytes.len() < 2 {
@@ -317,545 +506,53 @@ impl CPU {
         }
     }
 
-    /// Safely write to a register, ignoring writes to x0 (which should always be 0)
-    fn write_reg(&mut self, rd: usize, value: u32) {
-        if rd != 0 {
-            self.regs[rd] = value;
+    /// Safely read a register with metering.
+    fn read_reg(&mut self, reg: usize) -> Option<u32> {
+        if !Self::can_continue(self.metering.on_register_read(reg)) {
+            return None;
         }
-        // Writes to x0 are ignored (RISC-V specification)
+        Some(self.regs[reg])
     }
 
-
-    /// Executes a decoded instruction.
-    /// 
-    /// EDUCATIONAL PURPOSE: This is the execute phase of the instruction cycle.
-    /// It contains the implementation of all RISC-V instructions supported by
-    /// our VM. This is where the actual computation happens.
-    /// 
-    /// INSTRUCTION CATEGORIES:
-    /// - Arithmetic: ADD, SUB, MUL, DIV, etc.
-    /// - Logical: AND, OR, XOR, shifts
-    /// - Memory: Load and store operations
-    /// - Control: Branches and jumps
-    /// - System: System calls and special operations
-    /// 
-    /// REGISTER CONVENTIONS:
-    /// - rd: Destination register (where result goes)
-    /// - rs1, rs2: Source registers (operands)
-    /// - imm: Immediate value (constant)
-    /// 
-    /// RETURN VALUE: Returns true to continue execution, false to halt
-    pub fn execute(
-        &mut self, 
-        instr: Instruction, 
-        memory: Rc<RefCell<MemoryPage>>, 
-        storage: Rc<RefCell<Storage>>,
-        host: &mut Box<dyn HostInterface>) -> bool {
-        match instr {
-            // EDUCATIONAL: Arithmetic instructions - perform mathematical operations
-            Instruction::Add { rd, rs1, rs2 } => {
-                // EDUCATIONAL: Use wrapping_add to handle overflow correctly
-                // In real CPUs, overflow might set flags or cause exceptions
-                self.write_reg(rd, self.regs[rs1].wrapping_add(self.regs[rs2]))
-            }
-            Instruction::Sub { rd, rs1, rs2 } => {
-                self.write_reg(rd, self.regs[rs1].wrapping_sub(self.regs[rs2]))
-            }
-            Instruction::Addi { rd, rs1, imm } => {
-                self.write_reg(rd, self.regs[rs1].wrapping_add(imm as u32))
-            }
-            
-            // EDUCATIONAL: Logical instructions - perform bitwise operations
-            Instruction::And { rd, rs1, rs2 } => self.write_reg(rd, self.regs[rs1] & self.regs[rs2]),
-            Instruction::Or { rd, rs1, rs2 } => self.write_reg(rd, self.regs[rs1] | self.regs[rs2]),
-            Instruction::Xor { rd, rs1, rs2 } => self.write_reg(rd, self.regs[rs1] ^ self.regs[rs2]),
-            Instruction::Andi { rd, rs1, imm } => self.write_reg(rd, self.regs[rs1] & (imm as u32)),
-            Instruction::Ori { rd, rs1, imm } => self.write_reg(rd, self.regs[rs1] | (imm as u32)),
-            Instruction::Xori { rd, rs1, imm } => self.write_reg(rd, self.regs[rs1] ^ (imm as u32)),
-            
-            // EDUCATIONAL: Comparison instructions - set result to 0 or 1
-            Instruction::Slt { rd, rs1, rs2 } => {
-                // EDUCATIONAL: Set if less than (signed comparison)
-                self.write_reg(rd, (self.regs[rs1] as i32).lt(&(self.regs[rs2] as i32)) as u32)
-            }
-            Instruction::Sltu { rd, rs1, rs2 } => {
-                // EDUCATIONAL: Set if less than (unsigned comparison)
-                self.write_reg(rd, (self.regs[rs1].lt(&self.regs[rs2])) as u32)
-            }
-            Instruction::Slti { rd, rs1, imm } => {
-                self.write_reg(rd, (self.regs[rs1] as i32).lt(&imm) as u32)
-            }
-            Instruction::Sltiu { rd, rs1, imm } => {
-                let lhs = self.regs[rs1];
-                let rhs = imm as u32;
-                self.write_reg(rd, if lhs < rhs { 1 } else { 0 });
-            }
-            
-            // EDUCATIONAL: Shift instructions - move bits left or right
-            Instruction::Sll { rd, rs1, rs2 } => {
-                // EDUCATIONAL: Logical left shift - multiply by 2^shift_amount
-                // The & 0x1F ensures shift amount is 0-31 (5 bits)
-                self.write_reg(rd, self.regs[rs1] << (self.regs[rs2] & 0x1F))
-            }
-            Instruction::Srl { rd, rs1, rs2 } => {
-                // EDUCATIONAL: Logical right shift - divide by 2^shift_amount
-                self.write_reg(rd, self.regs[rs1] >> (self.regs[rs2] & 0x1F))
-            }
-            Instruction::Sra { rd, rs1, rs2 } => {
-                // EDUCATIONAL: Arithmetic right shift - preserves sign bit
-                self.write_reg(rd, ((self.regs[rs1] as i32) >> (self.regs[rs2] & 0x1F)) as u32)
-            }
-            Instruction::Slli { rd, rs1, shamt } => self.write_reg(rd, self.regs[rs1] << shamt),
-            Instruction::Srli { rd, rs1, shamt } => self.write_reg(rd, self.regs[rs1] >> shamt),
-            Instruction::Srai { rd, rs1, shamt } => {
-                self.write_reg(rd, ((self.regs[rs1] as i32) >> shamt) as u32)
-            }
-            
-            // EDUCATIONAL: Load instructions - read data from memory into registers
-            Instruction::Lw { rd, rs1, offset } => {
-                // EDUCATIONAL: Load word (32-bit) from memory
-                // Address = base register + offset
-                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                self.write_reg(rd, memory.borrow().load_u32(addr));
-            }
-            Instruction::Ld { rd, rs1, offset } => {
-                // EDUCATIONAL: Load doubleword (64-bit) from memory, truncated to 32-bit
-                // Since this is a 32-bit VM, we only load the lower 32 bits
-                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                self.write_reg(rd, memory.borrow().load_u32(addr));
-            }
-            Instruction::Lb { rd, rs1, offset } => {
-                // EDUCATIONAL: Load byte (8-bit, sign-extended)
-                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                let byte = memory.borrow().load_byte(addr);
-                let value = (byte as i8) as i32 as u32; // sign-extend to 32-bit
-                self.write_reg(rd, value);
-            }
-            Instruction::Lbu { rd, rs1, offset } => {
-                // EDUCATIONAL: Load byte unsigned (8-bit, zero-extended)
-                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                let byte = memory.borrow().load_byte(addr);
-                self.write_reg(rd, byte as u32);
-            }
-            Instruction::Lh { rd, rs1, offset } => {
-                // EDUCATIONAL: Load halfword (16-bit, sign-extended)
-                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                let halfword = memory.borrow().load_halfword(addr);
-                let value = (halfword as i16) as i32 as u32; // sign-extend to 32-bit
-                self.write_reg(rd, value);
-            }
-            Instruction::Lhu { rd, rs1, offset } => {
-                // EDUCATIONAL: Load halfword unsigned (16-bit, zero-extended)
-                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                let halfword = memory.borrow().load_halfword(addr);
-                self.write_reg(rd, halfword as u32); // zero-extend to 32-bit
-            }
-
-            // EDUCATIONAL: Store instructions - write data from registers to memory
-            Instruction::Sh { rs1, rs2, offset } => {
-                // EDUCATIONAL: Store halfword (16-bit)
-                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                memory.borrow_mut().store_u16(addr, (self.regs[rs2] & 0xFFFF) as u16);
-            }
-            Instruction::Sw { rs1, rs2, offset } => {
-                // EDUCATIONAL: Store word (32-bit)
-                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                memory.borrow_mut().store_u32(addr, self.regs[rs2]);
-            }
-            Instruction::Sb { rs1, rs2, offset } => {
-                // EDUCATIONAL: Store byte (8-bit)
-                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                memory.borrow_mut().store_u8(addr, (self.regs[rs2] & 0xFF) as u8);
-            }
-        
-            // EDUCATIONAL: Branch instructions - conditionally change the PC
-            // These implement if/else and loop constructs
-            Instruction::Beq { rs1, rs2, offset } => {
-                // EDUCATIONAL: Branch if equal - jump if two registers are equal
-                if self.regs[rs1] == self.regs[rs2] {
-                    self.pc = self.pc.wrapping_add(offset as u32);
-                    return true;
-                }
-            }
-            Instruction::Bne { rs1, rs2, offset } => {
-                // EDUCATIONAL: Branch if not equal
-                if self.regs[rs1] != self.regs[rs2] {
-                    self.pc = self.pc.wrapping_add(offset as u32);
-                    return true;
-                }
-            }
-            Instruction::Blt { rs1, rs2, offset } => {
-                // EDUCATIONAL: Branch if less than (signed comparison)
-                if (self.regs[rs1] as i32) < (self.regs[rs2] as i32) {
-                    self.pc = self.pc.wrapping_add(offset as u32);
-                    return true;
-                }
-            }
-            Instruction::Bge { rs1, rs2, offset } => {
-                // EDUCATIONAL: Branch if greater than or equal (signed)
-                if (self.regs[rs1] as i32) >= (self.regs[rs2] as i32) {
-                    self.pc = self.pc.wrapping_add(offset as u32);
-                    return true;
-                }
-            }
-            Instruction::Bltu { rs1, rs2, offset } => {
-                // EDUCATIONAL: Branch if less than (unsigned comparison)
-                if self.regs[rs1] < self.regs[rs2] {
-                    self.pc = self.pc.wrapping_add(offset as u32);
-                    return true;
-                }
-            }
-
-            Instruction::Bgeu { rs1, rs2, offset } => {
-                // EDUCATIONAL: Branch if greater than or equal (unsigned)
-                if self.regs[rs1] >= self.regs[rs2] {
-                    self.pc = self.pc.wrapping_add(offset as u32);
-                    return true;
-                }
-            }
-            // EDUCATIONAL: Jump and Link instructions - for function calls
-            Instruction::Jal { rd, offset, compressed } => {
-                // EDUCATIONAL: JAL (Jump and Link) - unconditional jump with return address
-                // Used for function calls and long-distance jumps
-                // The return address is stored in rd (usually x1/ra)
-                let return_address = if compressed { self.pc + 2 } else { self.pc + 4 };
-                self.write_reg(rd, return_address);
-                self.pc = self.pc.wrapping_add(offset as u32);
-                return true;
-            }
-            Instruction::Jalr { rd, rs1, offset , compressed} => {
-                // EDUCATIONAL: JALR (Jump and Link Register) - indirect function calls
-                // Target address = base register + offset, with bottom bit cleared
-                // This ensures proper alignment and is required by RISC-V spec
-                let base = self.regs[rs1];
-                let target = base.wrapping_add(offset as u32) & !1;
-                
-                // For compressed instructions (c.jalr), return address should be pc + 2
-                // For regular instructions (jalr), return address should be pc + 4
-                let return_address = if compressed { self.pc + 2 } else { self.pc + 4 };
-
-                self.write_reg(rd, return_address);
-
-                self.pc = target;
-                return true;
-            }
-
-            // EDUCATIONAL: Load Upper Immediate - loads immediate into upper bits
-            Instruction::Lui { rd, imm } => {
-                // EDUCATIONAL: LUI loads a 20-bit immediate into bits 31-12 of rd
-                // This is used to load large constants (like addresses) into registers
-                self.write_reg(rd, (imm << 12) as u32)
-            }
-            Instruction::Auipc { rd, imm } => {
-                // EDUCATIONAL: AUIPC (Add Upper Immediate to PC) - PC-relative addressing
-                // Used for position-independent code and loading addresses relative to PC
-                self.write_reg(rd, self.pc.wrapping_add((imm << 12) as u32));
-            }
-            
-            // EDUCATIONAL: Multiplication instructions - extended arithmetic
-            Instruction::Mul { rd, rs1, rs2 } => {
-                // EDUCATIONAL: MUL - multiply two registers, store lower 32 bits
-                self.write_reg(rd, self.regs[rs1].wrapping_mul(self.regs[rs2]))
-            }
-            Instruction::Mulh { rd, rs1, rs2 } => {
-                // EDUCATIONAL: MULH - multiply signed, store upper 32 bits
-                // Properly sign-extend 32-bit values to 64-bit for signed multiplication
-                let val1 = (self.regs[rs1] as i32) as i64;
-                let val2 = (self.regs[rs2] as i32) as i64;
-                let result = val1 * val2;
-                self.write_reg(rd, (result >> 32) as u32)
-            }
-            Instruction::Mulhu { rd, rs1, rs2 } => {
-                // EDUCATIONAL: MULHU - multiply unsigned, store upper 32 bits
-                self.write_reg(rd, (((self.regs[rs1] as u64) * (self.regs[rs2] as u64)) >> 32) as u32)
-            }
-            Instruction::Mulhsu { rd, rs1, rs2 } => {
-                // EDUCATIONAL: MULHSU - multiply signed by unsigned, store upper 32 bits
-                // Properly sign-extend first operand to signed 64-bit, keep second as unsigned 64-bit
-                let val1 = (self.regs[rs1] as i32) as i64;
-                let val2 = self.regs[rs2] as u64;
-                let result = val1 * (val2 as i64);
-                self.write_reg(rd, (result >> 32) as u32)
-            }
-            // EDUCATIONAL: Division and remainder instructions
-            Instruction::Div { rd, rs1, rs2 } => {
-                // EDUCATIONAL: DIV - signed division
-                // RISC-V spec: division by zero returns -1, overflow returns dividend
-                if self.regs[rs2] == 0 {
-                    self.write_reg(rd, 0xFFFFFFFF); // -1 in two's complement
-                } else {
-                    let dividend = self.regs[rs1] as i32;
-                    let divisor = self.regs[rs2] as i32;
-                    
-                    // Check for overflow: -2^31 / -1 = 2^31 (overflow)
-                    if dividend == i32::MIN && divisor == -1 {
-                        self.write_reg(rd, self.regs[rs1]); // Return dividend on overflow
-                    } else {
-                        self.write_reg(rd, (dividend / divisor) as u32)
-                    }
-                }
-            }
-            Instruction::Divu { rd, rs1, rs2 } => {
-                // EDUCATIONAL: DIVU - unsigned division
-                // RISC-V spec: division by zero returns 2^XLEN - 1
-                if self.regs[rs2] == 0 {
-                    self.write_reg(rd, 0xFFFFFFFF); // 2^32 - 1
-                } else {
-                    self.write_reg(rd, self.regs[rs1] / self.regs[rs2])
-                }
-            }
-            Instruction::Rem { rd, rs1, rs2 } => {
-                // EDUCATIONAL: REM - signed remainder
-                // RISC-V spec: remainder by zero returns dividend, overflow returns dividend
-                if self.regs[rs2] == 0 {
-                    self.write_reg(rd, self.regs[rs1])
-                } else {
-                    let dividend = self.regs[rs1] as i32;
-                    let divisor = self.regs[rs2] as i32;
-                    
-                    // Check for overflow: -2^31 % -1 = 0 (no overflow, but -2^31 % -1 = 0)
-                    if dividend == i32::MIN && divisor == -1 {
-                        self.write_reg(rd, 0) // Remainder of -2^31 % -1 is 0
-                    } else {
-                        self.write_reg(rd, (dividend % divisor) as u32)
-                    }
-                }
-            }
-            Instruction::Remu { rd, rs1, rs2 } => {
-                // EDUCATIONAL: REMU - unsigned remainder
-                // RISC-V spec: remainder by zero returns dividend
-                if self.regs[rs2] == 0 {
-                    self.write_reg(rd, self.regs[rs1])
-                } else {
-                    self.write_reg(rd, self.regs[rs1] % self.regs[rs2])
-                }
-            }
-            
-            // EDUCATIONAL: System instructions - for OS interaction and debugging
-            Instruction::Ecall => {
-                // Prepare syscall args from registers
-                let args = [
-                    self.regs[Register::A1 as usize],
-                    self.regs[Register::A2 as usize],
-                    self.regs[Register::A3 as usize],
-                    self.regs[Register::A4 as usize],
-                    self.regs[Register::A5 as usize],
-                    self.regs[Register::A6 as usize],
-                ];
-                let call_id = self.regs[Register::A7 as usize];
-                let (result, cont) = self.syscall_handler.handle_syscall(call_id, args, memory, storage, host, &mut self.regs);
-                self.regs[Register::A0 as usize] = result;
-                return cont;
-            }
-            Instruction::Csr { rd, rs1, csr, op, imm } => {
-                let src = if imm { rs1 as u32 } else { self.regs[rs1] };
-                let old = self.read_csr(csr);
-
-                // Apply CSR op semantics
-                let mut new_val = old;
-                match op {
-                    CsrOp::Csrrw => {
-                        if !(imm == false && rs1 == 0) {
-                            new_val = src;
-                        }
-                    }
-                    CsrOp::Csrrs => {
-                        if src != 0 {
-                            new_val = old | src;
-                        }
-                    }
-                    CsrOp::Csrrc => {
-                        if src != 0 {
-                            new_val = old & !src;
-                        }
-                    }
-                }
-
-                if src != 0 || matches!(op, CsrOp::Csrrw) {
-                    self.write_csr(csr, new_val);
-                }
-
-                if rd != 0 {
-                    self.write_reg(rd, old);
-                }
-            }
-            Instruction::Ebreak => {
-                // EDUCATIONAL: EBREAK - Environment Break - for debugging
-                // In real systems, this would trigger a debugger breakpoint
-                return false
-            }
-            Instruction::Mret => {
-                // Treat MRET as a simple return/halt in this VM
+    /// Safely write to a register, ignoring writes to x0 (which should always be 0).
+    /// Returns false if metering halts execution.
+    fn write_reg(&mut self, rd: usize, value: u32) -> bool {
+        if rd != 0 {
+            if !Self::can_continue(self.metering.on_register_write(rd)) {
                 return false;
             }
-            
-            // EDUCATIONAL: Compressed instruction set (RV32C) - space-saving instructions
-            Instruction::Jr { rs1 } => {
-                // EDUCATIONAL: JR (Jump Register) - compressed jump to register
-                self.pc = self.regs[rs1];
-                return true;
-            }
-            Instruction::Ret => {
-                // EDUCATIONAL: RET - compressed return instruction
-                // Equivalent to JR x1 (jump to return address register)
-                let target = self.regs[1]; // x1 = ra (return address)
-                if target == 0 || target == 0xFFFF_FFFF {
-                    return false; // halt if ret target is 0 or invalid
-                }
-    
-                self.pc = target;
-                return true;
-            }
-            Instruction::Mv { rd, rs2 } => {
-                // EDUCATIONAL: MV (Move) - compressed register copy
-                self.write_reg(rd, self.regs[rs2])
-            }
-            Instruction::Addi16sp { imm } => {
-                // EDUCATIONAL: ADDI16SP - add immediate to stack pointer
-                // x2 is the stack pointer (SP)
-                self.write_reg(2, self.regs[2].wrapping_add(imm as u32))
-            }
-            Instruction::Addi4spn { rd, imm } => {
-                // EDUCATIONAL: ADDI4SPN - add immediate to SP, store in rd
-                // Used for stack frame setup in function prologues
-                self.write_reg(rd, self.regs[2].wrapping_add(imm));
-            }
-            Instruction::Nop => {
-                // EDUCATIONAL: NOP - No Operation - does nothing
-                // Used for alignment and timing in real systems
-            }
-            Instruction::Beqz { rs1, offset } => {
-                // EDUCATIONAL: BEQZ - Branch if Equal to Zero (compressed)
-                if self.regs[rs1] == 0 {
-                    self.pc = self.pc.wrapping_add(offset as u32);
-                    return true;
-                }
-            }
-            Instruction::Bnez { rs1, offset } => {
-                // EDUCATIONAL: BNEZ - Branch if Not Equal to Zero (compressed)
-                if self.regs[rs1] != 0 {
-                    self.pc = self.pc.wrapping_add(offset as u32);
-                    return true;
-                }
-            }
-
-            // EDUCATIONAL: Miscellaneous ALU operations (compressed)
-            Instruction::MiscAlu { rd, rs2, op } => {
-                match op {
-                    crate::instruction::MiscAluOp::Sub => {
-                        // EDUCATIONAL: C.SUB - compressed subtract
-                        self.write_reg(rd, self.regs[rd].wrapping_sub(self.regs[rs2]));
-                    }
-                    crate::instruction::MiscAluOp::Xor => {
-                        // EDUCATIONAL: C.XOR - compressed XOR
-                        self.write_reg(rd, self.regs[rd] ^ self.regs[rs2]);
-                    }
-                    crate::instruction::MiscAluOp::Or => {
-                        // EDUCATIONAL: C.OR - compressed OR
-                        self.write_reg(rd, self.regs[rd] | self.regs[rs2]);
-                    }
-                    crate::instruction::MiscAluOp::And => {
-                        // EDUCATIONAL: C.AND - compressed AND
-                        self.write_reg(rd, self.regs[rd] & self.regs[rs2]);
-                    }
-                }
-            }
-            Instruction::Fence => {
-                // FENCE is a memory barrier in hardware, but is a no-op in this VM
-            }
-            Instruction::Unimp => {
-                // UNIMP is an unimplemented instruction, treat as a no-op for compatibility
-            }
-            // ===== RV32A (Atomics) =====
-            Instruction::AmoswapW { rd, rs1, rs2 } => {
-                let addr = self.regs[rs1] as usize;
-                let orig = memory.borrow().load_u32(addr);
-                memory.borrow_mut().store_u32(addr, self.regs[rs2]);
-                self.write_reg(rd, orig);
-            }
-            Instruction::AmoaddW { rd, rs1, rs2 } => {
-                let addr = self.regs[rs1] as usize;
-                let orig = memory.borrow().load_u32(addr);
-                let new_val = orig.wrapping_add(self.regs[rs2]);
-                memory.borrow_mut().store_u32(addr, new_val);
-                self.write_reg(rd, orig);
-            }
-            Instruction::AmoandW { rd, rs1, rs2 } => {
-                let addr = self.regs[rs1] as usize;
-                let orig = memory.borrow().load_u32(addr);
-                let new_val = orig & self.regs[rs2];
-                memory.borrow_mut().store_u32(addr, new_val);
-                self.write_reg(rd, orig);
-            }
-            Instruction::AmoorW { rd, rs1, rs2 } => {
-                let addr = self.regs[rs1] as usize;
-                let orig = memory.borrow().load_u32(addr);
-                let new_val = orig | self.regs[rs2];
-                memory.borrow_mut().store_u32(addr, new_val);
-                self.write_reg(rd, orig);
-            }
-            Instruction::AmoxorW { rd, rs1, rs2 } => {
-                let addr = self.regs[rs1] as usize;
-                let orig = memory.borrow().load_u32(addr);
-                let new_val = orig ^ self.regs[rs2];
-                memory.borrow_mut().store_u32(addr, new_val);
-                self.write_reg(rd, orig);
-            }
-            Instruction::AmomaxW { rd, rs1, rs2 } => {
-                let addr = self.regs[rs1] as usize;
-                let orig = memory.borrow().load_u32(addr);
-                let new_val = if (orig as i32) > (self.regs[rs2] as i32) { orig } else { self.regs[rs2] };
-                memory.borrow_mut().store_u32(addr, new_val);
-                self.write_reg(rd, orig);
-            }
-            Instruction::AmominW { rd, rs1, rs2 } => {
-                let addr = self.regs[rs1] as usize;
-                let orig = memory.borrow().load_u32(addr);
-                let new_val = if (orig as i32) < (self.regs[rs2] as i32) { orig } else { self.regs[rs2] };
-                memory.borrow_mut().store_u32(addr, new_val);
-                self.write_reg(rd, orig);
-            }
-            Instruction::AmomaxuW { rd, rs1, rs2 } => {
-                let addr = self.regs[rs1] as usize;
-                let orig = memory.borrow().load_u32(addr);
-                let new_val = if orig > self.regs[rs2] { orig } else { self.regs[rs2] };
-                memory.borrow_mut().store_u32(addr, new_val);
-                self.write_reg(rd, orig);
-            }
-            Instruction::AmominuW { rd, rs1, rs2 } => {
-                let addr = self.regs[rs1] as usize;
-                let orig = memory.borrow().load_u32(addr);
-                let new_val = if orig < self.regs[rs2] { orig } else { self.regs[rs2] };
-                memory.borrow_mut().store_u32(addr, new_val);
-                self.write_reg(rd, orig);
-            }
-            // ===== RV32A (LR/SC) =====
-            Instruction::LrW { rd, rs1 } => {
-                let addr = self.regs[rs1] as usize;
-                let value = memory.borrow().load_u32(addr);
-                self.write_reg(rd, value);
-                // Set reservation for this address
-                self.reservation_addr = Some(addr);
-            }
-            Instruction::ScW { rd, rs1, rs2 } => {
-                let addr = self.regs[rs1] as usize;
-                let value_to_store = self.regs[rs2];
-                
-                // Check if we have a valid reservation for this address
-                if self.reservation_addr == Some(addr) {
-                    // Reservation is valid, perform the store
-                    memory.borrow_mut().store_u32(addr, value_to_store);
-                    self.write_reg(rd, 0); // 0 = success
-                    // Clear the reservation (it's consumed)
-                    self.reservation_addr = None;
-                } else {
-                    // No valid reservation, fail
-                    self.write_reg(rd, 1); // 1 = failure
-                }
-            }
-            _ => todo!("unhandled instruction"),
+            self.regs[rd] = value;
         }
         true
+    }
 
-    }               
+    /// Add to the program counter with wrapping semantics and metering.
+    fn pc_add(&mut self, delta: u32) -> bool {
+        let old = self.pc;
+        let new_pc = self.pc.wrapping_add(delta);
+        if !Self::can_continue(self.metering.on_pc_update(old, new_pc)) {
+            return false;
+        }
+        self.pc = new_pc;
+        true
+    }
+
+    /// Add to the stack pointer (x2) with metering.
+    fn sp_add(&mut self, delta: u32) -> bool {
+        let sp = match self.read_reg(2) {
+            Some(v) => v,
+            None => return false,
+        };
+        self.write_reg(2, sp.wrapping_add(delta))
+    }
+
+    /// Set the program counter and meter the update.
+    fn set_pc(&mut self, target: u32) -> bool {
+        let old = self.pc;
+        if !Self::can_continue(self.metering.on_pc_update(old, target)) {
+            return false;
+        }
+        self.pc = target;
+        true
+    }
 }

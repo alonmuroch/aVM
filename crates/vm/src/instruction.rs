@@ -34,7 +34,7 @@
 /// PERFORMANCE IMPLICATIONS: Different instruction types have different
 /// execution costs. Memory operations are typically slower than register
 /// operations, and branches can cause pipeline stalls in real CPUs.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Instruction {
     // ===== RV32I =====
 
@@ -446,6 +446,8 @@ pub enum Instruction {
 
     /// MRET: Machine-mode return (treated as a halt in this VM)
     Mret,
+    /// SRET: Supervisor-mode return
+    Sret,
 
     /// C.MISC-ALU: compressed miscellaneous ALU operations
     /// EDUCATIONAL: Compressed miscellaneous ALU operations including C.SUB, C.XOR, C.OR, C.AND.
@@ -486,7 +488,7 @@ pub enum CsrOp {
 /// EDUCATIONAL: Miscellaneous ALU operations for compressed instructions.
 /// These represent the different operations that can be performed by the C.MISC-ALU instruction.
 /// Each operation is a 16-bit compressed version of a corresponding 32-bit instruction.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum MiscAluOp {
     /// C.SUB: rd = rd - rs2 (compressed subtract)
     /// EDUCATIONAL: Compressed subtract operation. Subtracts rs2 from rd and stores result in rd.
@@ -670,6 +672,8 @@ impl Instruction {
                 "ebreak".to_string(),
             Instruction::Mret =>
                 "mret".to_string(),
+            Instruction::Sret =>
+                "sret".to_string(),
             Instruction::Csr { rd, rs1, csr, op, imm } => {
                 let op_str = match op {
                     CsrOp::Csrrw => if *imm { "csrrwi" } else { "csrrw" },

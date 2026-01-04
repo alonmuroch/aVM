@@ -3,9 +3,13 @@
 
 use std::io::Read;
 use std::path::Path;
+use vm::memory::{API, MMU, Perms, Sv32Memory, VirtualAddress, PAGE_SIZE};
+use vm::registers::Register;
 use vm::vm::VM;
-mod test_syscall_handler;
-use test_syscall_handler::TestSyscallHandler;
+
+const DEFAULT_VM_SIZE: usize = 16 * 1024 * 1024;
+const STACK_SIZE: usize = 256 * 1024;
+const MAX_STEPS: usize = 20_000_000;
 
 /// Tests that are skipped and the reasons why
 const SKIPPED_TESTS: &[(&str, &str)] = &[
@@ -43,7 +47,8 @@ fn run_single_test(elf_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Parse ELF
     let elf = compiler::elf::parse_elf_from_bytes(&elf_bytes)?;
     let (code, code_start) = elf.get_flat_code().ok_or("No code section in ELF")?;
-    let (rodata, rodata_start) = elf.get_flat_rodata().unwrap_or((vec![], usize::MAX as u64));
+    let (rodata, rodata_start) = elf.get_flat_rodata().unwrap_or((vec![], u64::MAX));
+    let (bss, bss_start) = elf.get_flat_bss().unwrap_or((vec![], u64::MAX));
     
     // Get .data section if it exists
     let (data, data_start) = if let Some(data_section) = elf.get_section_by_name(".data") {
@@ -53,55 +58,132 @@ fn run_single_test(elf_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Find .tohost section
-    if let Some(tohost_section) = elf.get_section_by_name(".tohost") {
-        println!(".tohost section found at addr=0x{:x}, size=0x{:x}", tohost_section.addr, tohost_section.size);
+    let tohost_section = if let Some(tohost_section) = elf.get_section_by_name(".tohost") {
+        println!(
+            ".tohost section found at addr=0x{:x}, size=0x{:x}",
+            tohost_section.addr, tohost_section.size
+        );
+        tohost_section
     } else {
         println!(".tohost section not found, skipping...");
         return Ok(());
-    }
+    };
+    let tohost_addr = tohost_section.addr;
 
-    // Set up VM memory (allocate enough to cover 0x80000000+)
-    let memory = std::rc::Rc::new(std::cell::RefCell::new(vm::memory_page::MemoryPage::new_with_base(0x20000, 0x80000000))); // 128KB at 0x80000000
-    println!("Loading code into VM: addr=0x{:x}, size=0x{:x}", code_start, code.len());
-
-    // Set up VM
-    let storage = std::rc::Rc::new(std::cell::RefCell::new(storage::Storage::default()));
-    let host: Box<dyn vm::host_interface::HostInterface> = Box::new(vm::host_interface::NoopHost {});
-    // When constructing the VM, use the test syscall handler:
-    let mut syscall_handler = Box::new(TestSyscallHandler::new());
-    
-    // Set .tohost address if found
-    if let Some(tohost_section) = elf.get_section_by_name(".tohost") {
-        syscall_handler.set_tohost_addr(tohost_section.addr);
-        syscall_handler.set_memory(memory.clone());
-    }
-    
-    // Move the handler into the VM, then extract it after run
-    let mut vm = VM::new_with_syscall_handler(
-        memory.clone(),
-        storage,
-        host,
-        syscall_handler,
-    );
-    vm.cpu.verbose = false; // Set to false to reduce output for multiple tests
-    vm.set_code(code_start as u32, code_start as u32, &code);
+    let mut min_base = code_start as usize;
+    let mut image_end = (code_start as usize) + code.len();
 
     if !rodata.is_empty() {
-        println!("Writing rodata to memory: addr=0x{:x}, size=0x{:x}", rodata_start, rodata.len());
-        memory.borrow_mut().write_code(rodata_start as usize, &rodata);
+        min_base = min_base.min(rodata_start as usize);
+        image_end = image_end.max((rodata_start as usize) + rodata.len());
     }
-
     if !data.is_empty() {
-        println!("Writing data to memory: addr=0x{:x}, size=0x{:x}", data_start, data.len());
-        memory.borrow_mut().write_code(data_start as usize, &data);
+        min_base = min_base.min(data_start);
+        image_end = image_end.max(data_start + data.len());
+    }
+    if !bss.is_empty() {
+        min_base = min_base.min(bss_start as usize);
+        image_end = image_end.max((bss_start as usize) + bss.len());
+    }
+    let tohost_start = tohost_section.addr as usize;
+    let tohost_end = tohost_start + (tohost_section.size as usize);
+    min_base = min_base.min(tohost_start);
+    image_end = image_end.max(tohost_end);
+
+    let image_size = image_end
+        .checked_sub(min_base)
+        .ok_or("invalid image size")?;
+    let map_len = image_size + STACK_SIZE;
+    let total_size = map_len.max(DEFAULT_VM_SIZE);
+    let memory = std::rc::Rc::new(Sv32Memory::new(total_size, PAGE_SIZE));
+
+    println!("Loading code into VM: addr=0x{:x}, size=0x{:x}", code_start, code.len());
+    println!("Mapping {:x}-{:x} (size=0x{:x})", min_base, min_base + map_len, map_len);
+    memory.map_range(VirtualAddress(min_base as u32), map_len, Perms::rwx_kernel());
+
+    let mut image = vec![0u8; image_size];
+    let code_off = (code_start as usize).saturating_sub(min_base);
+    image[code_off..code_off + code.len()].copy_from_slice(&code);
+    if !rodata.is_empty() {
+        let ro_off = (rodata_start as usize).saturating_sub(min_base);
+        image[ro_off..ro_off + rodata.len()].copy_from_slice(&rodata);
+    }
+    if !data.is_empty() {
+        let data_off = data_start.saturating_sub(min_base);
+        image[data_off..data_off + data.len()].copy_from_slice(&data);
+    }
+    if !bss.is_empty() {
+        let bss_off = (bss_start as usize).saturating_sub(min_base);
+        image[bss_off..bss_off + bss.len()].copy_from_slice(&bss);
+    }
+    if !tohost_section.data.is_empty() {
+        let tohost_off = tohost_start.saturating_sub(min_base);
+        image[tohost_off..tohost_off + tohost_section.data.len()]
+            .copy_from_slice(tohost_section.data);
+    }
+    memory.write_bytes(VirtualAddress(min_base as u32), &image);
+
+    let stack_top = (min_base as u32)
+        .checked_add(map_len as u32)
+        .ok_or("stack top overflow")?;
+    let entry_point = code_start as u32;
+
+    let mut vm = VM::new(memory.clone());
+    vm.cpu.verbose = false;
+    vm.cpu.pc = entry_point;
+    vm.set_reg_u32(Register::Sp, stack_top);
+    let root_satp = memory.satp();
+
+    println!("Running test...");
+    let mut steps = 0usize;
+    loop {
+        if !vm.cpu.step(memory.clone()) {
+            break;
+        }
+        steps += 1;
+        if memory.satp() == 0 {
+            memory.set_satp(root_satp);
+        }
+        if steps > MAX_STEPS {
+            return Err("execution limit reached without tohost signal".into());
+        }
+        let tohost_value = read_tohost_value(memory.as_ref(), tohost_addr)?;
+        if tohost_value != 0 {
+            if tohost_value == 1 {
+                println!("Test completed.");
+                return Ok(());
+            }
+            return Err(format!("test failed (tohost=0x{:x})", tohost_value).into());
+        }
+    }
+    
+    let exit_id = vm.cpu.regs[Register::A7 as usize];
+    if exit_id == 93 {
+        let exit_code = vm.cpu.regs[Register::A0 as usize];
+        if exit_code == 0 {
+            println!("Test completed.");
+            return Ok(());
+        }
+        return Err(format!("test failed (ecall exit code={})", exit_code).into());
     }
 
-    // Run the VM
-    println!("Running test...");
-    vm.raw_run();
-    println!("Test completed.");
-    
-    Ok(())
+    Err("execution halted without tohost signal".into())
+}
+
+fn read_tohost_value(memory: &Sv32Memory, tohost_addr: u64) -> Result<u64, Box<dyn std::error::Error>> {
+    let addr = u32::try_from(tohost_addr).map_err(|_| "tohost address out of range")?;
+    let start = VirtualAddress(addr);
+    let end = start
+        .checked_add(8)
+        .ok_or("tohost address overflow")?;
+    let slice = memory
+        .mem_slice(start, end)
+        .ok_or("tohost not mapped")?;
+    if slice.len() < 8 {
+        return Err("tohost slice truncated".into());
+    }
+    let bytes: [u8; 8] = slice[0..8].try_into()?;
+    Ok(u64::from_le_bytes(bytes))
 }
 
 /// Discover and collect test files for a specific category

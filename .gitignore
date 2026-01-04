@@ -62,6 +62,9 @@ no_llvm_build
 # Created by nix dev shell / .envrc
 src/tools/nix-dev-shell/flake.lock
 
+# Project outputs
+crates/os/bin/
+
 ## ICE reports
 rustc-ice-*.txt
 

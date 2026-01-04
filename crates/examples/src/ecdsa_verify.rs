@@ -1,11 +1,11 @@
 #![no_std]
 #![no_main]
 
-extern crate program;
-use k256::ecdsa::{signature::hazmat::PrehashVerifier, Signature, VerifyingKey};
-use program::{
-    entrypoint, log, logf, require, types::address::Address, types::result::Result, vm_panic,
-    DataParser, HexCodec,
+extern crate clibc;
+use k256::ecdsa::{Signature, VerifyingKey, signature::hazmat::PrehashVerifier};
+use clibc::{
+    DataParser, HexCodec, entrypoint, log, logf, require, types::address::Address,
+    types::result::Result, vm_panic,
 };
 
 /// ECDSA verification example using k256.
@@ -14,17 +14,23 @@ use program::{
 /// - N bytes: SEC1-encoded pubkey
 /// - 64 bytes: signature (r||s)
 /// - 32 bytes: message hash (already hashed)
-fn my_vm_entry(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
+fn my_vm_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
+    let _ = program;
     let mut parser = DataParser::new(data);
 
     let pk_len = parser.read_bytes(1)[0] as usize;
-    require(pk_len == 33 || pk_len == 65, b"pubkey must be 33 or 65 bytes");
+    require(
+        pk_len == 33 || pk_len == 65,
+        b"pubkey must be 33 or 65 bytes",
+    );
     let pk_bytes = parser.read_bytes(pk_len);
     let sig_bytes = parser.read_bytes(64);
     let hash = parser.read_bytes(32);
 
-    let verifying_key = VerifyingKey::from_sec1_bytes(pk_bytes).unwrap_or_else(|_| vm_panic(b"invalid pubkey"));
-    let signature = Signature::from_slice(sig_bytes).unwrap_or_else(|_| vm_panic(b"invalid signature"));
+    let verifying_key =
+        VerifyingKey::from_sec1_bytes(pk_bytes).unwrap_or_else(|_| vm_panic(b"invalid pubkey"));
+    let signature =
+        Signature::from_slice(sig_bytes).unwrap_or_else(|_| vm_panic(b"invalid signature"));
 
     // Log the received inputs in hex for visibility
     logf!("ecdsa_verify: pk_len=%d", pk_len as u32);

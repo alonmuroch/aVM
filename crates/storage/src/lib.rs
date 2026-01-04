@@ -1,11 +1,14 @@
-// crates/storage/src/lib.rs
+#![no_std]
 
 extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
 
-use core::cell::RefCell;
 use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
+use alloc::format;
 use alloc::string::String;
+use alloc::vec::Vec;
+use core::cell::RefCell;
 
 /// Represents persistent storage for the blockchain virtual machine.
 /// 
@@ -159,13 +162,14 @@ impl Storage {
     /// 
     /// OUTPUT FORMAT: Shows each key-value pair in storage, with the value
     /// displayed in hexadecimal format.
+    #[cfg(feature = "std")]
     pub fn dump(&self) {
-        println!("--- Storage Dump ---");
+        std::println!("--- Storage Dump ---");
         for (key, value) in self.map.borrow().iter() {
             let key_str = key;
             let value_hex: Vec<String> = value.iter().map(|b| format!("{:02x}", b)).collect();
-            println!("Key: {:<20} | Value ({} bytes): {}", key_str, value.len(), value_hex.join(" "));
+            std::println!("Key: {:<20} | Value ({} bytes): {}", key_str, value.len(), value_hex.join(" "));
         }
-        println!("--------------------");
+        std::println!("--------------------");
     }
 }

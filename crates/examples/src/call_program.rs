@@ -1,11 +1,11 @@
 #![no_std]
 #![no_main]
 
-extern crate program;
+extern crate clibc;
 
-use program::{entrypoint, types::result::Result, require, vm_panic, DataParser};
-use program::call::call;
-use program::types::address::Address;
+use clibc::call::call;
+use clibc::types::address::Address;
+use clibc::{DataParser, entrypoint, require, types::result::Result, vm_panic};
 
 // Include the auto-generated ABI client code for simple program
 include!("../bin/simple_abi.rs");
@@ -16,7 +16,8 @@ include!("../bin/simple_abi.rs");
 /// The program expects:
 /// - 20 bytes: Address of the simple contract
 /// - 8 bytes: Two u32 values to compare (4 bytes each)
-fn my_vm_entry(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
+fn my_vm_entry(program: Address, caller: Address, data: &[u8]) -> Result {
+    let _ = program;
     // Ensure there's enough data
     require(data.len() == 28, b"input data must be 28 bytes");
 
@@ -37,7 +38,7 @@ fn my_vm_entry(_self_address: Address, _caller: Address, data: &[u8]) -> Result 
     call_data[4..8].copy_from_slice(&second.to_le_bytes());
     
     // Call the simple contract using the generated client's call_main method
-    let ret = match simple_client.call_main(&_caller, &call_data) {
+    let ret = match simple_client.call_main(&caller, &call_data) {
         Some(result) => result,
         None => vm_panic(b"program call failed"),
     };

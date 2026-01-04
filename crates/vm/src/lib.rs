@@ -1,10 +1,10 @@
+pub mod cpu;
+pub mod console;
+pub mod decoder;
+pub mod instruction;
 pub mod isa;
 pub mod isa_compressed;
-pub mod instruction;
-pub mod decoder;
-pub mod vm;
-pub mod cpu;
+pub mod memory;
+pub mod metering;
 pub mod registers;
-pub mod memory_page;
-pub mod sys_call;
-pub mod host_interface;
+pub mod vm;

@@ -1,0 +1,16 @@
+[package]
+name = "a_tests"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+compiler = { path = "../crates/compiler" }
+goblin = "0.8"
+types = { path = "../crates/types" }
+vm = { path = "../crates/vm" }
+
+[dev-dependencies]
+state = { path = "../crates/state" }

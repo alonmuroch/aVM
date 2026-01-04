@@ -1,13 +1,15 @@
 [workspace]
 members = [
-    "crates/avm",
     "crates/compiler",
     "crates/examples",
-    "crates/program",
+    "crates/bootloader",
+    "crates/kernel",
+    "crates/clibc",
     "crates/state",
     "crates/storage",
     "crates/types",
     "crates/vm",
+    "aTester",
 ]
 
 [profile.release]

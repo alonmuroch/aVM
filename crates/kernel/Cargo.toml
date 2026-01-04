@@ -1,0 +1,55 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+guest_kernel = []
+
+[dependencies]
+clibc = { path = "../clibc", features = ["kernel"] }
+types = { path = "../types" }
+state = { path = "../state" }
+
+[[bin]]
+name = "kernel"
+path = "src/main.rs"
+required-features = ["guest_kernel"]
+
+#####################
+#    Kernel Tests
+#####################
+
+[[bin]]
+name = "kernel_first_test"
+path = "src/memory/tests/first_test.rs"
+required-features = ["guest_kernel"]
+
+[[bin]]
+name = "kernel_mem_alloc_test"
+path = "src/memory/tests/mem_alloc_test.rs"
+required-features = ["guest_kernel"]
+
+[[bin]]
+name = "kernel_mem_map_test"
+path = "src/memory/tests/mem_map_test.rs"
+required-features = ["guest_kernel"]
+
+[[bin]]
+name = "kernel_mem_map_edge_test"
+path = "src/memory/tests/mem_map_edge_test.rs"
+required-features = ["guest_kernel"]
+
+[[bin]]
+name = "kernel_page_alloc_test"
+path = "src/memory/tests/page_alloc_test.rs"
+required-features = ["guest_kernel"]
+
+[[bin]]
+name = "kernel_heap_edge_test"
+path = "src/memory/tests/heap_edge_test.rs"
+required-features = ["guest_kernel"]

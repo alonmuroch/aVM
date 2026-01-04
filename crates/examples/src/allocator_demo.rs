@@ -3,14 +3,17 @@
 
 extern crate alloc;
 
-use program::{entrypoint, types::result::Result, types::address::Address, require, vm_panic, DataParser};
+use clibc::{
+    DataParser, entrypoint, require, types::address::Address, types::result::Result, vm_panic,
+};
 
 /// Guest program that demonstrates heap allocation using VM syscalls
 entrypoint!(main);
-fn main(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
+fn main(program: Address, _caller: Address, data: &[u8]) -> Result {
+    let _ = program;
     // Need to import alloc types after entrypoint macro includes the allocator
-    use alloc::vec::Vec;
     use alloc::collections::BTreeMap;
+    use alloc::vec::Vec;
 
     // Expect at least 6 u32 values in little-endian form:
     // - first 3 populate the Vec

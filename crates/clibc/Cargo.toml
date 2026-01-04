@@ -1,0 +1,12 @@
+[package]
+name = "clibc"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+guest = []
+kernel = []
+
+[dependencies]
+types = { path = "../types" }
+state = { path = "../state", default-features = false }
