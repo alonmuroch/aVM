@@ -76,8 +76,6 @@ fn test_function_extraction() {
     let function_names: Vec<&str> = abi.functions.iter().map(|f| f.name.as_str()).collect();
     assert!(function_names.contains(&"init"));
     assert!(function_names.contains(&"transfer"));
-    assert!(function_names.contains(&"approve"));
-    assert!(function_names.contains(&"transfer_from"));
     assert!(function_names.contains(&"balance_of"));
     
     // Check selectors

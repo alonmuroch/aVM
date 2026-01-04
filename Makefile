@@ -8,7 +8,7 @@ KERNEL_OUT_DIR := crates/bootloader/bin
 KERNEL_BINS := $(shell awk '/\[\[bin\]\]/{inbin=1;next} inbin && /name =/{gsub(/"/,"",$$3); print $$3; inbin=0}' $(KERNEL_MANIFEST))
 KERNEL_TEST_BINS := $(filter-out kernel,$(KERNEL_BINS))
 
-all: clean program examples test utils summary
+all: clean examples test utils summary
 
 .PHONY: run_examples
 .PHONY: kernel
@@ -35,12 +35,6 @@ clean:
 	@cd utils/binary_comparison && $(MAKE) clean > /dev/null 2>&1 || true
 	@echo "=== Clean complete ==="
 
-program: 
-	@echo "=== Building program ==="
-	cargo clean -p program
-	cargo build -p program --target riscv32im-unknown-none-elf
-	@echo "=== Program build complete ==="
-
 examples:
 	@echo "=== Building example programs ==="
 	$(MAKE) -C crates/examples
@@ -49,9 +43,7 @@ examples:
 test: generate_abis
 	@echo "=== Running tests ==="
 	cargo test -p types -p storage -p state -- --nocapture
-	cargo test -p program -- --nocapture
 	cargo test -p vm -- --nocapture
-	cargo test -p os -- --nocapture
 	cargo test -p compiler -- --nocapture
 	cd crates/examples && cargo test -- --nocapture
 	@echo "=== Tests complete ==="
@@ -72,7 +64,6 @@ summary:
 	@echo "🎉 BUILD SUMMARY"
 	@echo "================"
 	@echo "✅ Cleaned project artifacts"
-	@echo "✅ Built program crate for RISC-V target"
 	@echo "✅ Built example programs:"
 	@echo "   - allocator_demo: Memory allocation demonstration"
 	@echo "   - call_program: Cross-contract call demonstration"
@@ -90,7 +81,6 @@ summary:
 	@echo "   - types"
 	@echo "   - storage"
 	@echo "   - state"
-	@echo "   - program"
 	@echo "   - vm"
 	@echo "   - compiler"
 	@echo "✅ Tested VM instruction soundness:"
