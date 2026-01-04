@@ -29,6 +29,16 @@ This second chapter covers the evolution of AVM from a basic instruction interpr
 - A complete ERC-20 implementation with events and logging
 - Transaction receipts and event decoding
 
+### 🎯 **Chapter 3: AVM Report #3, From VM in Rust to a Real Kernel**
+**[Read the full article on Medium →](https://alonmuroch-65570.medium.com/avm-report-3-from-vm-in-rust-to-a-real-kernel-3f3be1764d8c?postPublishedType=initial)**
+
+This third chapter explores the new kernel-first architecture and what it unlocks. You'll learn about:
+- Bootloader + kernel separation
+- Sv32 memory and trap-driven syscalls
+- Task-based execution and receipts
+- aTester framework and avm32 toolchain
+- First ECDSA verification and the full DEX example
+
 *More chapters coming soon covering advanced features, optimizations, and real-world applications!*
 
 ---
