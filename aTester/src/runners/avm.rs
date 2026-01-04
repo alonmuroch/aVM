@@ -7,6 +7,7 @@ use std::rc::Rc;
 use compiler::elf::parse_elf_from_bytes;
 use goblin::elf::Elf;
 use types::boot::BootInfo;
+use types::kernel_result::KERNEL_RESULT_ADDR;
 use types::SV32_DIRECT_MAP_BASE;
 use vm::memory::{API, MMU, Perms, Sv32Memory, VirtualAddress, HEAP_PTR_OFFSET, PAGE_SIZE};
 use vm::registers::Register;
@@ -81,60 +82,36 @@ impl ArchRunner for AvmRunner {
             vm.set_reg_u32(ARG_REGS[reg_idx], *ptr);
             vm.set_reg_u32(ARG_REGS[reg_idx + 1], input_lens[idx]);
         }
-        vm.set_reg_u32(Register::A6, boot_info_ptr);
-        vm.set_reg_u32(Register::A7, 0);
+        let boot_reg_idx = options.input.len() * 2;
+        if boot_reg_idx >= ARG_REGS.len() {
+            return Err(RunError {
+                message: "no argument register available for boot info".to_string(),
+            });
+        }
+        vm.set_reg_u32(ARG_REGS[boot_reg_idx], boot_info_ptr);
+        if boot_reg_idx + 1 < ARG_REGS.len() {
+            vm.set_reg_u32(ARG_REGS[boot_reg_idx + 1], 0);
+        }
 
         vm.raw_run();
 
         let stdout = writer.borrow().buffer.clone();
-        let results = read_test_results(memory.as_ref())?;
-        let exit_code = if results.status == 0 { 0 } else { 1 };
-        let stderr = if results.status == 0 {
-            String::new()
-        } else {
-            format!("test failed: {}", results.detail)
-        };
+        let output = read_kernel_blob(memory.as_ref()).unwrap_or_default();
+        let exit_code = 0;
+        let stderr = String::new();
 
         Ok(RunResult {
             exit_code,
             stdout,
             stderr,
+            output,
         })
     }
 }
 
 const KERNEL_WINDOW_BYTES: usize = 4 * 1024 * 1024;
 const KERNEL_STACK_TOP: u32 = KERNEL_WINDOW_BYTES as u32;
-const TEST_RESULTS_ADDR: u32 = 0x0003_f000;
-
-#[repr(C)]
-struct TestResults {
-    status: u32,
-    detail: u32,
-}
-
-fn read_test_results(memory: &Sv32Memory) -> Result<TestResults, RunError> {
-    let start = VirtualAddress(TEST_RESULTS_ADDR);
-    let end = start
-        .checked_add(mem::size_of::<TestResults>() as u32)
-        .ok_or_else(|| RunError {
-            message: "test results overflow".to_string(),
-        })?;
-    let slice = memory
-        .mem_slice(start, end)
-        .ok_or_else(|| RunError {
-            message: "test results not found".to_string(),
-        })?;
-    let bytes = slice.as_ref();
-    if bytes.len() < mem::size_of::<TestResults>() {
-        return Err(RunError {
-            message: "test results truncated".to_string(),
-        });
-    }
-    let status = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
-    let detail = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
-    Ok(TestResults { status, detail })
-}
+const KERNEL_RESULT_DUMP_BYTES: u32 = 1024 * 1024;
 
 fn load_kernel(
     elf_bytes: &[u8],
@@ -229,6 +206,13 @@ fn load_kernel(
     }
 
     Ok(entry_point)
+}
+
+fn read_kernel_blob(memory: &Sv32Memory) -> Option<Vec<u8>> {
+    let start = VirtualAddress(KERNEL_RESULT_ADDR);
+    let end = start.checked_add(KERNEL_RESULT_DUMP_BYTES)?;
+    let slice = memory.mem_slice(start, end)?;
+    Some(slice.as_ref().to_vec())
 }
 
 fn place_boot_info(memory: &Sv32Memory, heap_ptr: &Cell<u32>, memory_size: usize) -> Result<u32, RunError> {

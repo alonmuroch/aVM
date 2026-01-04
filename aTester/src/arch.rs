@@ -7,6 +7,7 @@ pub struct RunResult {
     pub exit_code: i32,
     pub stdout: String,
     pub stderr: String,
+    pub output: Vec<u8>,
 }
 
 #[derive(Debug)]

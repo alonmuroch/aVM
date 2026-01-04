@@ -24,8 +24,8 @@ run_examples:
 	@echo "=== Building example programs ==="
 	RUSTFLAGS="-Awarnings" $(MAKE) -C crates/examples
 	@$(MAKE) kernel
-	@echo "=== Running example crate tests ==="
-	cd crates/examples && RUSTFLAGS="-Awarnings" KERNEL_ELF="../bootloader/bin/kernel.elf" cargo test --test examples_test -- --nocapture
+	@echo "=== Running aTester example tests ==="
+	cargo test -p a_tests --test examples -- --nocapture
 	@echo "=== Example programs build and tests complete ==="
 
 clean:

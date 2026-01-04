@@ -7,15 +7,18 @@ struct ExitCodeEvaluator;
 
 impl TestEvaluator for ExitCodeEvaluator {
     fn evaluate(&self, case: &TestCase, result: &a_tests::RunResult) -> TestOutcome {
-        if result.exit_code == 0 {
-            TestOutcome::Passed
-        } else {
-            let detail = if result.stderr.is_empty() {
-                format!("{} failed with exit code {}", case.name, result.exit_code)
-            } else {
-                result.stderr.clone()
-            };
-            TestOutcome::Failed(detail)
+        match read_test_results_from_output(&result.output) {
+            Ok(results) => {
+                if results.status == 0 {
+                    TestOutcome::Passed
+                } else {
+                    TestOutcome::Failed(format!(
+                        "{} failed with detail {}",
+                        case.name, results.detail
+                    ))
+                }
+            }
+            Err(err) => TestOutcome::Failed(format!("{} failed: {}", case.name, err)),
         }
     }
 }
@@ -80,6 +83,20 @@ fn kernel_tests() {
         }
         panic!("kernel test failures:\n{}", details);
     }
+}
+
+struct TestResults {
+    status: u32,
+    detail: u32,
+}
+
+fn read_test_results_from_output(output: &[u8]) -> Result<TestResults, String> {
+    if output.len() < 8 {
+        return Err("missing test results output".to_string());
+    }
+    let status = u32::from_le_bytes(output[0..4].try_into().unwrap());
+    let detail = u32::from_le_bytes(output[4..8].try_into().unwrap());
+    Ok(TestResults { status, detail })
 }
 
 fn kernel_bins() -> Result<Vec<String>, String> {
