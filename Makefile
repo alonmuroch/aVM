@@ -8,10 +8,11 @@ KERNEL_OUT_DIR := crates/bootloader/bin
 KERNEL_BINS := $(shell awk '/\[\[bin\]\]/{inbin=1;next} inbin && /name =/{gsub(/"/,"",$$3); print $$3; inbin=0}' $(KERNEL_MANIFEST))
 KERNEL_TEST_BINS := $(filter-out kernel,$(KERNEL_BINS))
 
-all: clean examples test utils summary
+all: clean examples test atests utils summary
 
 .PHONY: run_examples
 .PHONY: kernel
+.PHONY: atests
 
 kernel:
 	@echo "=== Building kernel ELF ==="
@@ -47,6 +48,9 @@ test: generate_abis
 	cargo test -p compiler -- --nocapture
 	cd crates/examples && cargo test -- --nocapture
 	@echo "=== Tests complete ==="
+
+atests:
+	cargo test -p a_tests -- --nocapture
 
 generate_abis:
 	@echo "=== Generating ABIs ==="

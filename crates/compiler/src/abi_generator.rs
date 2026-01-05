@@ -244,7 +244,9 @@ impl AbiGenerator {
     /// Find function definition and create FunctionAbi
     fn find_function_definition(&self, lines: &[&str], start_line: usize, function_name: &str) -> Option<FunctionAbi> {
         // Look for function definition pattern: fn function_name(...)
-        for i in start_line..lines.len() {
+        let forward = start_line..lines.len();
+        let backward = 0..start_line;
+        for i in forward.chain(backward) {
             let trimmed = lines[i].trim();
             if trimmed.starts_with("fn ") && trimmed.contains(function_name) {
                 // Extract function signature
@@ -253,7 +255,7 @@ impl AbiGenerator {
                 }
             }
         }
-        
+
         None
     }
     
