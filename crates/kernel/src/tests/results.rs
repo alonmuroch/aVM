@@ -12,13 +12,6 @@ impl TestResults {
             detail,
         }
     }
-
-    pub const fn fail(detail: u32) -> Self {
-        Self {
-            status: 1,
-            detail,
-        }
-    }
 }
 
 pub unsafe fn write_results(results: TestResults) {

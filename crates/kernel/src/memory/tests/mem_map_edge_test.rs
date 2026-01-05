@@ -11,6 +11,8 @@ use kernel::memory::page_allocator::{self, PagePerms};
 
 #[path = "../../tests/results.rs"]
 mod results;
+#[path = "../../tests/fail.rs"]
+mod fail;
 #[path = "../../tests/utils.rs"]
 mod utils;
 
@@ -31,32 +33,32 @@ pub extern "C" fn _start(
 
     let user_root = page_allocator::alloc_root().unwrap_or(0);
     if user_root == 0 {
-        utils::fail(1);
+        fail::fail(1);
     }
 
     if let Err(code) = test_unaligned_map_and_translate(user_root, info) {
-        utils::fail(code);
+        fail::fail(code);
     }
     if let Err(code) = test_cross_l1_boundary(user_root, info) {
-        utils::fail(code);
+        fail::fail(code);
     }
     if let Err(code) = test_multiple_l2_tables(user_root, info) {
-        utils::fail(code);
+        fail::fail(code);
     }
     if let Err(code) = test_zero_len_map_no_effect(user_root, info) {
-        utils::fail(code);
+        fail::fail(code);
     }
     if let Err(code) = test_map_to_physical_alignment_and_alias(user_root, info) {
-        utils::fail(code);
+        fail::fail(code);
     }
     if let Err(code) = test_mirror_gap_behavior(user_root, info) {
-        utils::fail(code);
+        fail::fail(code);
     }
     if let Err(code) = test_copy_user_atomic(user_root, info) {
-        utils::fail(code);
+        fail::fail(code);
     }
     if let Err(code) = test_remap_override_perms(user_root, info) {
-        utils::fail(code);
+        fail::fail(code);
     }
 
     log!("kernel mem map edge test done");

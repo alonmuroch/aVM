@@ -71,16 +71,19 @@ fn examples_tests() {
     let cases = all_example_cases()
         .expect("failed to build example bundles")
         .into_iter()
-        .map(|case| TestCase {
-            name: case.name.to_string(),
-            kind: TestKind::Smoke,
-            elf: target_dir.join("kernel.elf"),
-            options: RunOptions {
-                timeout_ms: None,
-                vm_memory_size: None,
-                verbose: false,
-                input: vec![case.bundle.encode(), state_bytes.clone()],
-            },
+        .map(|case| {
+            println!("Running example: {} - {}", case.name, case.description);
+            TestCase {
+                name: case.name.to_string(),
+                kind: TestKind::Smoke,
+                elf: target_dir.join("kernel.elf"),
+                options: RunOptions {
+                    timeout_ms: None,
+                    vm_memory_size: None,
+                    verbose: false,
+                    input: vec![case.bundle.encode(), state_bytes.clone()],
+                },
+            }
         })
         .collect::<Vec<_>>();
 

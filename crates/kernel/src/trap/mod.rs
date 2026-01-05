@@ -38,7 +38,7 @@ const REG_SP: usize = 2;
 const REG_PC: usize = 32;
 
 #[repr(C)]
-struct TrapReturn {
+pub struct TrapReturn {
     sp: u32,
     kind: u32,
 }

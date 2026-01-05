@@ -26,7 +26,7 @@ use clibc::{DataParser, entrypoint, require, types::result::Result, vm_panic};
 fn my_vm_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
     // EDUCATIONAL: Use the router to handle multiple function calls
     // The router decodes the input data and calls the appropriate function
-    route(data, program, _caller, |to, from, call| {
+    route(data, program, _caller, |_to, _from, call| {
         match call.selector {
             0x01 => compare(call.args), // Function selector 0x01 = compare function
             0x02 => other(call.args),   // Function selector 0x02 = other function

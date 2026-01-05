@@ -3,7 +3,7 @@
 
 extern crate clibc;
 use clibc::{
-    DataParser, Map, StorageKey, entrypoint, event, fire_event, log, logf, persist_struct,
+    DataParser, Map, StorageKey, entrypoint, event, fire_event, logf, persist_struct,
     require, router::route, types::{address::Address, o::O, result::Result}, vm_panic,
 };
 
@@ -47,7 +47,7 @@ impl StorageKey for AllowanceKey {
 }
 
 unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
-    route(data, program, caller, |to, from, call| {
+    route(data, program, caller, |_to, _from, call| {
         match call.selector {
             0x01 => {
                 init(&program, caller, call.args);
@@ -89,7 +89,7 @@ unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
 fn init(program: &Address, caller: Address, args: &[u8]) {
     logf!("init called");
     let mut meta = match Metadata::load(program) {
-        O::Some(m) => vm_panic(b"already initialized"),
+        O::Some(_) => vm_panic(b"already initialized"),
         O::None => Metadata {
             total_supply: 0,
             decimals: 0,

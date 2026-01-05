@@ -7,8 +7,8 @@ use clibc::{
     DataParser, entrypoint, require, types::address::Address, types::result::Result, vm_panic,
 };
 
-/// Guest program that demonstrates heap allocation using VM syscalls
 entrypoint!(main);
+/// Guest program that demonstrates heap allocation using VM syscalls
 fn main(program: Address, _caller: Address, data: &[u8]) -> Result {
     let _ = program;
     // Need to import alloc types after entrypoint macro includes the allocator
