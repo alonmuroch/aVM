@@ -6,10 +6,10 @@ use std::rc::Rc;
 
 use compiler::elf::parse_elf_from_bytes;
 use goblin::elf::Elf;
+use types::SV32_DIRECT_MAP_BASE;
 use types::boot::BootInfo;
 use types::kernel_result::KERNEL_RESULT_ADDR;
-use types::SV32_DIRECT_MAP_BASE;
-use vm::memory::{API, MMU, Perms, Sv32Memory, VirtualAddress, HEAP_PTR_OFFSET, PAGE_SIZE};
+use vm::memory::{API, HEAP_PTR_OFFSET, MMU, PAGE_SIZE, Perms, Sv32Memory, VirtualAddress};
 use vm::registers::Register;
 use vm::vm::VM;
 
@@ -127,11 +127,9 @@ fn load_kernel(
         })?
         .entry as u32;
 
-    let (code, code_base) = elf
-        .get_flat_code()
-        .ok_or_else(|| RunError {
-            message: "kernel elf missing .text".to_string(),
-        })?;
+    let (code, code_base) = elf.get_flat_code().ok_or_else(|| RunError {
+        message: "kernel elf missing .text".to_string(),
+    })?;
     let (rodata, ro_base) = elf.get_flat_rodata().unwrap_or((Vec::new(), code_base));
     let (bss, bss_base) = elf.get_flat_bss().unwrap_or((Vec::new(), code_base));
 
@@ -150,11 +148,9 @@ fn load_kernel(
             })? as usize;
         image_end = core::cmp::max(image_end, bss_end);
     }
-    let image_size = image_end
-        .checked_sub(min_base)
-        .ok_or_else(|| RunError {
-            message: "invalid image size".to_string(),
-        })?;
+    let image_size = image_end.checked_sub(min_base).ok_or_else(|| RunError {
+        message: "invalid image size".to_string(),
+    })?;
 
     if image_end > memory.size() {
         return Err(RunError {
@@ -215,7 +211,11 @@ fn read_kernel_blob(memory: &Sv32Memory) -> Option<Vec<u8>> {
     Some(slice.as_ref().to_vec())
 }
 
-fn place_boot_info(memory: &Sv32Memory, heap_ptr: &Cell<u32>, memory_size: usize) -> Result<u32, RunError> {
+fn place_boot_info(
+    memory: &Sv32Memory,
+    heap_ptr: &Cell<u32>,
+    memory_size: usize,
+) -> Result<u32, RunError> {
     let heap_start = ensure_heap_ptr(heap_ptr);
     let aligned_heap = (heap_start + 7) & !7;
     let boot_info_size = mem::size_of::<BootInfo>() as u32;

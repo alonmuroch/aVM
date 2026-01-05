@@ -1,19 +1,18 @@
 //! Kernel-owned syscall stubs. These mirror the bootloader syscalls but
 //! are now dispatched from the kernel trap handler. Implementations will
 //! land here; for now they panic to make missing pieces explicit.
-use clibc::{log, logf};
 use clibc::syscalls::{
     SYSCALL_ALLOC, SYSCALL_BALANCE, SYSCALL_BRK, SYSCALL_CALL_PROGRAM, SYSCALL_DEALLOC,
-    SYSCALL_FIRE_EVENT, SYSCALL_PANIC, SYSCALL_STORAGE_GET, SYSCALL_STORAGE_SET,
-    SYSCALL_TRANSFER,
+    SYSCALL_FIRE_EVENT, SYSCALL_PANIC, SYSCALL_STORAGE_GET, SYSCALL_STORAGE_SET, SYSCALL_TRANSFER,
 };
+use clibc::{log, logf};
 
 pub mod alloc;
+pub mod balance;
 pub mod call_program;
 pub mod fire_event;
 pub mod panic;
 pub mod storage;
-pub mod balance;
 
 use alloc::{sys_alloc, sys_dealloc};
 use balance::{sys_balance, sys_transfer};
@@ -34,7 +33,8 @@ pub struct SyscallContext<'a> {
 }
 
 pub trait SyscallHandler: core::fmt::Debug {
-    fn handle_syscall(&mut self, call_id: u32, args: [u32; 6], ctx: &mut SyscallContext<'_>) -> u32;
+    fn handle_syscall(&mut self, call_id: u32, args: [u32; 6], ctx: &mut SyscallContext<'_>)
+    -> u32;
 }
 
 pub fn dispatch_syscall(call_id: u32, args: [u32; 6], ctx: &mut SyscallContext<'_>) -> u32 {

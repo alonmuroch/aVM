@@ -9,10 +9,10 @@ use clibc::log;
 use kernel::BootInfo;
 use kernel::memory::page_allocator::{self, PagePerms};
 
-#[path = "../../tests/results.rs"]
-mod results;
 #[path = "../../tests/fail.rs"]
 mod fail;
+#[path = "../../tests/results.rs"]
+mod results;
 #[path = "../../tests/utils.rs"]
 mod utils;
 
@@ -20,11 +20,7 @@ const PAGE_SIZE: usize = 0x1000;
 const L1_SPAN: u32 = 1 << 22;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn _start(
-    input_ptr: *const u8,
-    input_len: usize,
-    boot_info_ptr: *const BootInfo,
-) {
+pub extern "C" fn _start(input_ptr: *const u8, input_len: usize, boot_info_ptr: *const BootInfo) {
     log!("kernel mem map edge test boot");
     let info = utils::init_test_kernel(boot_info_ptr);
 
@@ -80,8 +76,8 @@ fn test_unaligned_map_and_translate(user_root: u32, info: BootInfo) -> Result<()
     }
 
     let first_phys = page_allocator::translate(user_root, va_start).unwrap_or(0);
-    let last_phys = page_allocator::translate(user_root, va_start.wrapping_add(len as u32 - 1))
-        .unwrap_or(0);
+    let last_phys =
+        page_allocator::translate(user_root, va_start.wrapping_add(len as u32 - 1)).unwrap_or(0);
     if first_phys == 0 || last_phys == 0 {
         return Err(11);
     }
@@ -121,8 +117,8 @@ fn test_cross_l1_boundary(user_root: u32, info: BootInfo) -> Result<(), u32> {
 
     log!("subtest: confirm translations and data access on both pages");
     let first_phys = page_allocator::translate(user_root, start).unwrap_or(0);
-    let second_phys = page_allocator::translate(user_root, start.wrapping_add(PAGE_SIZE as u32))
-        .unwrap_or(0);
+    let second_phys =
+        page_allocator::translate(user_root, start.wrapping_add(PAGE_SIZE as u32)).unwrap_or(0);
     if first_phys == 0 || second_phys == 0 {
         return Err(21);
     }
@@ -132,12 +128,16 @@ fn test_cross_l1_boundary(user_root: u32, info: BootInfo) -> Result<(), u32> {
     if !page_allocator::copy_user(user_root, start, &first_data) {
         return Err(22);
     }
-    if !page_allocator::copy_user(user_root, start.wrapping_add(PAGE_SIZE as u32), &second_data) {
+    if !page_allocator::copy_user(
+        user_root,
+        start.wrapping_add(PAGE_SIZE as u32),
+        &second_data,
+    ) {
         return Err(23);
     }
     let first_word = page_allocator::peek_word(user_root, start).unwrap_or(0);
-    let second_word = page_allocator::peek_word(user_root, start.wrapping_add(PAGE_SIZE as u32))
-        .unwrap_or(0);
+    let second_word =
+        page_allocator::peek_word(user_root, start.wrapping_add(PAGE_SIZE as u32)).unwrap_or(0);
     if first_word != 0xa4a3_a2a1 || second_word != 0xb4b3_b2b1 {
         return Err(24);
     }
@@ -194,7 +194,12 @@ fn test_multiple_l2_tables(user_root: u32, info: BootInfo) -> Result<(), u32> {
         if phys == 0 {
             return Err(35);
         }
-        let data = [0x90u8 + idx as u8, 0x91 + idx as u8, 0x92 + idx as u8, 0x93 + idx as u8];
+        let data = [
+            0x90u8 + idx as u8,
+            0x91 + idx as u8,
+            0x92 + idx as u8,
+            0x93 + idx as u8,
+        ];
         if !page_allocator::copy_user(user_root, *va, &data) {
             return Err(36);
         }
@@ -210,10 +215,7 @@ fn test_multiple_l2_tables(user_root: u32, info: BootInfo) -> Result<(), u32> {
     Ok(())
 }
 
-fn test_map_to_physical_alignment_and_alias(
-    user_root: u32,
-    info: BootInfo,
-) -> Result<(), u32> {
+fn test_map_to_physical_alignment_and_alias(user_root: u32, info: BootInfo) -> Result<(), u32> {
     // Description: map_to_physical must reject unaligned physical addresses and alias
     // when aligned.
     log!("test: map_to_physical alignment + aliasing");
@@ -296,12 +298,8 @@ fn test_mirror_gap_behavior(user_root: u32, info: BootInfo) -> Result<(), u32> {
     let end_va = base.wrapping_add((PAGE_SIZE * 2) as u32);
     let kernel_before_gap = page_allocator::translate(kernel_root, gap_va);
     let kernel_before_end = page_allocator::translate(kernel_root, end_va);
-    let mirror_ok = page_allocator::mirror_user_range_into_kernel(
-        user_root,
-        base,
-        PAGE_SIZE * 3,
-        perms,
-    );
+    let mirror_ok =
+        page_allocator::mirror_user_range_into_kernel(user_root, base, PAGE_SIZE * 3, perms);
     if mirror_ok {
         return Err(52);
     }
@@ -350,11 +348,7 @@ fn test_copy_user_atomic(user_root: u32, info: BootInfo) -> Result<(), u32> {
     if !page_allocator::copy(user_root, base, &seed_first) {
         return Err(62);
     }
-    if !page_allocator::copy(
-        user_root,
-        base.wrapping_add(PAGE_SIZE as u32),
-        &seed_second,
-    ) {
+    if !page_allocator::copy(user_root, base.wrapping_add(PAGE_SIZE as u32), &seed_second) {
         return Err(63);
     }
     let boundary_seed = [0x01u8, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
@@ -374,16 +368,10 @@ fn test_copy_user_atomic(user_root: u32, info: BootInfo) -> Result<(), u32> {
     }
     let first_word = page_allocator::peek_word(user_root, base).unwrap_or(0);
     let boundary_word0 = page_allocator::peek_word(user_root, boundary_start).unwrap_or(0);
-    let boundary_word1 = page_allocator::peek_word(
-        user_root,
-        boundary_start.wrapping_add(4),
-    )
-    .unwrap_or(0);
-    let second_word = page_allocator::peek_word(
-        user_root,
-        base.wrapping_add(PAGE_SIZE as u32),
-    )
-    .unwrap_or(0);
+    let boundary_word1 =
+        page_allocator::peek_word(user_root, boundary_start.wrapping_add(4)).unwrap_or(0);
+    let second_word =
+        page_allocator::peek_word(user_root, base.wrapping_add(PAGE_SIZE as u32)).unwrap_or(0);
     if first_word != 0x4433_2211
         || boundary_word0 != 0x0403_0201
         || boundary_word1 != 0x0807_0605

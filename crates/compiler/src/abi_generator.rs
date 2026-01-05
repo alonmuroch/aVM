@@ -1,6 +1,6 @@
+use crate::abi::{ContractAbi, EventAbi, EventParam, FunctionAbi, FunctionParam, ParamType};
 use std::fs;
 use std::path::Path;
-use crate::abi::{ContractAbi, FunctionAbi, FunctionParam, EventAbi, EventParam, ParamType};
 
 /// ABI Generator that analyzes Rust source code to extract function and event definitions
 pub struct AbiGenerator {
@@ -28,12 +28,13 @@ impl AbiGenerator {
     fn extract_events(&mut self) {
         // Look for event! macro invocations
         let lines: Vec<&str> = self.source_code.lines().collect();
-        
+
         let mut i = 0;
         while i < lines.len() {
             let line = lines[i].trim();
             if line.starts_with("event!(") {
-                if let Some((event, consumed_lines)) = self.parse_event_macro_multi_line(&lines, i) {
+                if let Some((event, consumed_lines)) = self.parse_event_macro_multi_line(&lines, i)
+                {
                     self.abi.add_event(event);
                     i += consumed_lines;
                 } else {
@@ -46,16 +47,20 @@ impl AbiGenerator {
     }
 
     /// Parse an event! macro invocation that may span multiple lines
-    fn parse_event_macro_multi_line(&self, lines: &[&str], start_line: usize) -> Option<(EventAbi, usize)> {
+    fn parse_event_macro_multi_line(
+        &self,
+        lines: &[&str],
+        start_line: usize,
+    ) -> Option<(EventAbi, usize)> {
         let mut event_content = String::new();
         let mut brace_count = 0;
         let mut in_event = false;
         let mut consumed_lines = 0;
-        
+
         for i in start_line..lines.len() {
             let line = lines[i].trim();
             consumed_lines += 1;
-            
+
             if !in_event {
                 if line.starts_with("event!(") {
                     in_event = true;
@@ -69,51 +74,52 @@ impl AbiGenerator {
                 // Count braces
                 brace_count += line.chars().filter(|&c| c == '{').count();
                 brace_count -= line.chars().filter(|&c| c == '}').count();
-                
+
                 // If we've closed all braces, we're done
                 if brace_count == 0 && line.ends_with(");") {
                     break;
                 }
             }
         }
-        
+
         if !in_event {
             return None;
         }
-        
-        self.parse_event_macro(&event_content).map(|event| (event, consumed_lines))
+
+        self.parse_event_macro(&event_content)
+            .map(|event| (event, consumed_lines))
     }
 
     /// Parse an event! macro invocation
     fn parse_event_macro(&self, line: &str) -> Option<EventAbi> {
         // Simple parsing for event! macro
         // Example: event!(Minted { caller => Address, amount => u32, });
-        
+
         let trimmed = line.trim();
         if !trimmed.starts_with("event!(") || !trimmed.ends_with(");") {
             return None;
         }
 
         // Extract the content between event!( and );
-        let content = &trimmed[7..trimmed.len()-2];
-        
+        let content = &trimmed[7..trimmed.len() - 2];
+
         // Find the event name (first word before {)
         let brace_pos = content.find('{')?;
         let event_name = content[..brace_pos].trim();
-        
+
         // Extract field definitions
-        let fields_content = &content[brace_pos+1..];
+        let fields_content = &content[brace_pos + 1..];
         let fields_content = fields_content.trim_end_matches('}');
-        
+
         let mut inputs = Vec::new();
         let field_lines: Vec<&str> = fields_content.split(',').collect();
-        
+
         for field_line in field_lines {
             let field_line = field_line.trim();
             if field_line.is_empty() {
                 continue;
             }
-            
+
             // Parse field: name => type
             if let Some((name, param_type)) = self.parse_event_field(field_line) {
                 inputs.push(EventParam {
@@ -123,7 +129,7 @@ impl AbiGenerator {
                 });
             }
         }
-        
+
         Some(EventAbi {
             name: event_name.to_string(),
             inputs,
@@ -137,10 +143,10 @@ impl AbiGenerator {
         if parts.len() != 2 {
             return None;
         }
-        
+
         let name = parts[0].trim();
         let type_str = parts[1].trim();
-        
+
         let param_type = self.parse_param_type(type_str)?;
         Some((name, param_type))
     }
@@ -163,9 +169,9 @@ impl AbiGenerator {
     fn extract_functions(&mut self) {
         // Look for router patterns and function selectors
         let lines: Vec<&str> = self.source_code.lines().collect();
-        
+
         let functions = self.collect_functions_from_router(&lines);
-        
+
         // Add all collected functions
         for function in functions {
             self.abi.add_function(function);
@@ -175,32 +181,34 @@ impl AbiGenerator {
     /// Collect functions from router match patterns
     fn collect_functions_from_router(&self, lines: &[&str]) -> Vec<FunctionAbi> {
         let mut functions = vec![];
-        
+
         for (i, line) in lines.iter().enumerate() {
             let line = line.trim();
-            
+
             // Look for selector patterns like "0x01 => {"
             if line.starts_with("0x") && line.contains("=>") {
                 if let Some(selector) = self.parse_selector_from_line(line) {
                     // Check if this line has a direct function call (e.g., "0x01 => compare(call.args),")
                     if let Some(function_name) = self.extract_direct_function_call(line) {
-                        if let Some(function) = self.find_function_definition(lines, i, &function_name) {
+                        if let Some(function) =
+                            self.find_function_definition(lines, i, &function_name)
+                        {
                             let mut function = function;
                             function.selector = selector;
                             functions.push(function);
                         }
                         continue;
                     }
-                    
+
                     // Check for multi-line pattern with braces
                     if line.contains('{') {
                         // Look for function calls in subsequent lines within braces
                         let mut brace_count = 0;
                         let mut in_braces = false;
-                        
+
                         for j in i..lines.len() {
                             let next_line = lines[j].trim();
-                            
+
                             // Count braces to track scope
                             for ch in next_line.chars() {
                                 match ch {
@@ -217,18 +225,22 @@ impl AbiGenerator {
                                     _ => {}
                                 }
                             }
-                            
+
                             if in_braces && brace_count > 0 {
                                 // Look for function calls in this line
-                                if let Some(function_name) = self.extract_function_call_from_line(next_line) {
-                                    if let Some(function) = self.find_function_definition(lines, j, &function_name) {
+                                if let Some(function_name) =
+                                    self.extract_function_call_from_line(next_line)
+                                {
+                                    if let Some(function) =
+                                        self.find_function_definition(lines, j, &function_name)
+                                    {
                                         let mut function = function;
                                         function.selector = selector;
                                         functions.push(function);
                                     }
                                 }
                             }
-                            
+
                             if !in_braces && brace_count == 0 {
                                 break;
                             }
@@ -237,12 +249,17 @@ impl AbiGenerator {
                 }
             }
         }
-        
+
         functions
     }
 
     /// Find function definition and create FunctionAbi
-    fn find_function_definition(&self, lines: &[&str], start_line: usize, function_name: &str) -> Option<FunctionAbi> {
+    fn find_function_definition(
+        &self,
+        lines: &[&str],
+        start_line: usize,
+        function_name: &str,
+    ) -> Option<FunctionAbi> {
         // Look for function definition pattern: fn function_name(...)
         let forward = start_line..lines.len();
         let backward = 0..start_line;
@@ -258,17 +275,17 @@ impl AbiGenerator {
 
         None
     }
-    
+
     pub fn extract_function_signature(&self, lines: &[&str], start_line: usize) -> Option<String> {
         let mut signature = String::new();
-        
+
         for i in start_line..lines.len() {
             let line = lines[i].trim();
-            
+
             if line.starts_with("fn ") {
                 // Start collecting the signature
                 signature.push_str(line);
-                
+
                 // Check if this line contains the opening brace
                 if line.contains('{') {
                     // Remove everything from the opening brace onwards
@@ -277,38 +294,40 @@ impl AbiGenerator {
                     }
                     return Some(signature);
                 }
-                
+
                 // Continue to next line if no opening brace
                 continue;
             }
-            
+
             // If we're already collecting a signature, add this line
             if !signature.is_empty() {
                 signature.push_str(line);
-                
+
                 // Check if this line contains the opening brace
                 if line.contains('{') {
                     // Remove everything from the opening brace onwards
                     if let Some(brace_pos) = line.find('{') {
-                        signature = signature[..signature.len() - (line.len() - brace_pos)].trim().to_string();
+                        signature = signature[..signature.len() - (line.len() - brace_pos)]
+                            .trim()
+                            .to_string();
                     }
                     return Some(signature);
                 }
             }
         }
-        
+
         None
     }
-    
+
     pub fn parse_function_signature(&self, function_name: &str, signature: String) -> FunctionAbi {
         let mut inputs = vec![];
         let mut outputs = vec![]; // Start with empty outputs for void functions
-        
+
         // Parse function signature like: fn init(caller: Address, args: &[u8])
         if let Some(params_start) = signature.find('(') {
             if let Some(params_end) = signature.find(')') {
                 let params_str = &signature[params_start + 1..params_end];
-                
+
                 // Parse parameters
                 for param in params_str.split(',') {
                     let param = param.trim();
@@ -328,18 +347,20 @@ impl AbiGenerator {
                 }
             }
         }
-        
+
         // Parse return type if present
         if let Some(arrow_pos) = signature.find("->") {
             let after_arrow = &signature[arrow_pos + 2..].trim();
             // Find the end of the return type (first space or brace)
-            let return_type_end = after_arrow.find(' ').unwrap_or(after_arrow.find('{').unwrap_or(after_arrow.len()));
+            let return_type_end = after_arrow
+                .find(' ')
+                .unwrap_or(after_arrow.find('{').unwrap_or(after_arrow.len()));
             let return_type_str = &after_arrow[..return_type_end];
             if let Some(param_type) = self.parse_param_type_from_str(return_type_str) {
                 outputs = vec![param_type];
             }
         }
-        
+
         FunctionAbi {
             name: function_name.to_string(),
             selector: 0, // Will be set by caller
@@ -347,20 +368,20 @@ impl AbiGenerator {
             outputs,
         }
     }
-    
+
     fn parse_parameter(&self, param_str: &str) -> Option<(String, ParamType)> {
         // Parse parameter like: "caller: Address" or "args: &[u8]"
         if let Some(colon_pos) = param_str.find(':') {
             let name = param_str[..colon_pos].trim();
             let type_str = param_str[colon_pos + 1..].trim();
-            
+
             if let Some(param_type) = self.parse_param_type_from_str(type_str) {
                 return Some((name.to_string(), param_type));
             }
         }
         None
     }
-    
+
     pub fn parse_param_type_from_str(&self, type_str: &str) -> Option<ParamType> {
         match type_str.trim() {
             "Address" => Some(ParamType::Address),
@@ -382,60 +403,63 @@ impl AbiGenerator {
         if parts.len() != 2 {
             return None;
         }
-        
+
         let selector_str = parts[0].trim();
         if !selector_str.starts_with("0x") {
             return None;
         }
-        
+
         u8::from_str_radix(&selector_str[2..], 16).ok()
     }
-    
+
     fn extract_direct_function_call(&self, line: &str) -> Option<String> {
         // Look for pattern like "0x01 => compare(call.args),"
         if let Some(arrow_pos) = line.find("=>") {
             let after_arrow = &line[arrow_pos + 2..].trim();
             if let Some(start) = after_arrow.find('(') {
                 let function_name = after_arrow[..start].trim();
-                if !function_name.is_empty() && 
-                   !function_name.contains(' ') && 
-                   !function_name.contains("::") && 
-                   !function_name.contains('.') {
+                if !function_name.is_empty()
+                    && !function_name.contains(' ')
+                    && !function_name.contains("::")
+                    && !function_name.contains('.')
+                {
                     return Some(function_name.to_string());
                 }
             }
         }
         None
     }
-    
+
     fn extract_function_call_from_line(&self, line: &str) -> Option<String> {
         // Look for function call pattern: function_name(...)
         if let Some(start) = line.find('(') {
             let potential_name = line[..start].trim();
-            if !potential_name.is_empty() && 
-               !potential_name.contains(' ') && 
-               !potential_name.contains("::") && 
-               !potential_name.contains('.') {
+            if !potential_name.is_empty()
+                && !potential_name.contains(' ')
+                && !potential_name.contains("::")
+                && !potential_name.contains('.')
+            {
                 return Some(potential_name.to_string());
             }
         }
-        
+
         // Also look for patterns like "let b = balance_of(call.args)"
         if line.contains("let") && line.contains('=') {
             if let Some(equals_pos) = line.find('=') {
                 let after_equals = &line[equals_pos + 1..];
                 if let Some(start) = after_equals.find('(') {
                     let potential_name = after_equals[..start].trim();
-                    if !potential_name.is_empty() && 
-                       !potential_name.contains(' ') && 
-                       !potential_name.contains("::") && 
-                       !potential_name.contains('.') {
+                    if !potential_name.is_empty()
+                        && !potential_name.contains(' ')
+                        && !potential_name.contains("::")
+                        && !potential_name.contains('.')
+                    {
                         return Some(potential_name.to_string());
                     }
                 }
             }
         }
-        
+
         None
     }
 
@@ -457,24 +481,24 @@ impl AbiGenerator {
 pub fn generate_all_example_abis() -> std::io::Result<()> {
     let examples_dir = "crates/examples/src";
     let bin_dir = "crates/examples/bin";
-    
+
     // Ensure bin directory exists
     fs::create_dir_all(bin_dir)?;
-    
+
     let source_files = vec![
         "simple.rs",
-        "storage.rs", 
+        "storage.rs",
         "erc20.rs",
         "multi_func.rs",
         "call_program.rs",
     ];
-    
+
     for source_file in source_files {
         let source_path = format!("{}/{}", examples_dir, source_file);
         let abi_path = format!("{}/{}.abi.json", bin_dir, source_file.replace(".rs", ""));
-        
+
         println!("Generating ABI for {}", source_file);
-        
+
         match AbiGenerator::from_file(&source_path) {
             Ok(abi) => {
                 AbiGenerator::write_abi_to_file(&abi, &abi_path)?;
@@ -485,6 +509,6 @@ pub fn generate_all_example_abis() -> std::io::Result<()> {
             }
         }
     }
-    
+
     Ok(())
 }

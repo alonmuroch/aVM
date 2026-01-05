@@ -1,7 +1,8 @@
-use core::arch::asm;
 use clibc::{log, logf};
-use types::result::{Result as VmResult, RESULT_DATA_SIZE};
+use core::arch::asm;
+use types::result::{RESULT_DATA_SIZE, Result as VmResult};
 
+use crate::Task;
 use crate::global::{
     CURRENT_TASK, KERNEL_TASK_SLOT, LAST_COMPLETED_TASK, MAX_RESULT_SIZE, RESULT_ADDR, TASKS,
 };
@@ -10,10 +11,9 @@ use crate::syscall;
 use crate::syscall::alloc::alloc_in_task;
 use crate::syscall::storage::read_user_bytes;
 use crate::task::TRAMPOLINE_VA;
-use crate::Task;
 
-mod save_trap_frame;
 mod restore_trap_frame;
+mod save_trap_frame;
 
 use restore_trap_frame::restore_trap_frame;
 use save_trap_frame::save_trap_frame;
@@ -131,7 +131,11 @@ pub extern "C" fn handle_trap(saved: *mut u32) -> TrapReturn {
     }
 
     let code = scause & 0xfff;
-    let mut return_kind = if read_sstatus() & SSTATUS_SPP != 0 { 1 } else { 0 };
+    let mut return_kind = if read_sstatus() & SSTATUS_SPP != 0 {
+        1
+    } else {
+        0
+    };
     let mut return_sp = regs[REG_SP];
     match code {
         SCAUSE_ECALL_FROM_U | SCAUSE_ECALL_FROM_S => {
@@ -192,7 +196,9 @@ pub extern "C" fn handle_trap(saved: *mut u32) -> TrapReturn {
                 if let Some(caller_task) = tasks.get_mut(caller_idx) {
                     if caller_idx != KERNEL_TASK_SLOT {
                         let result_ptr = match result_for_caller {
-                            Some(result) => write_result_to_caller(caller_task, &result).unwrap_or(0),
+                            Some(result) => {
+                                write_result_to_caller(caller_task, &result).unwrap_or(0)
+                            }
                             None => 0,
                         };
                         caller_task.tf.regs[REG_A0] = result_ptr;
@@ -232,7 +238,9 @@ pub extern "C" fn handle_trap(saved: *mut u32) -> TrapReturn {
                 sstatus &= !SSTATUS_SPP;
                 return_kind = 0;
             }
-            unsafe { asm!("csrw sstatus, {0}", in(reg) sstatus); }
+            unsafe {
+                asm!("csrw sstatus, {0}", in(reg) sstatus);
+            }
         }
         _ => log!("unhandled trap"),
     }
@@ -261,20 +269,23 @@ extern "C" fn ensure_kernel_root_for_trap() {
 #[inline(always)]
 fn read_scause() -> usize {
     let value: usize;
-    unsafe { asm!("csrr {0}, scause", out(reg) value); }
+    unsafe {
+        asm!("csrr {0}, scause", out(reg) value);
+    }
     value
 }
 
 #[inline(always)]
 fn read_sstatus() -> u32 {
     let value: u32;
-    unsafe { asm!("csrr {0}, sstatus", out(reg) value); }
+    unsafe {
+        asm!("csrr {0}, sstatus", out(reg) value);
+    }
     value
 }
 
 fn read_task_result(task: &Task) -> Option<VmResult> {
-    let result_bytes =
-        read_user_bytes(task.addr_space.root_ppn, RESULT_ADDR, MAX_RESULT_SIZE)?;
+    let result_bytes = read_user_bytes(task.addr_space.root_ppn, RESULT_ADDR, MAX_RESULT_SIZE)?;
     if result_bytes.len() < 9 {
         return None;
     }
@@ -327,6 +338,8 @@ fn write_result_to_caller(caller_task: &mut Task, result: &VmResult) -> Option<u
 #[inline(always)]
 fn read_stval() -> usize {
     let value: usize;
-    unsafe { asm!("csrr {0}, stval", out(reg) value); }
+    unsafe {
+        asm!("csrr {0}, stval", out(reg) value);
+    }
     value
 }

@@ -66,7 +66,7 @@ impl Result {
     /// Caller must ensure `ptr` points to at least 5 valid bytes in memory.
     #[cfg(target_arch = "riscv32")]
     pub fn from_ptr(result_ptr: u32) -> Option<Self> {
-       // SAFETY: We assume the memory starting at `result_ptr` is valid and readable.
+        // SAFETY: We assume the memory starting at `result_ptr` is valid and readable.
         let ptr = result_ptr as *const u8;
         if ptr.is_null() {
             return None;
@@ -88,7 +88,12 @@ impl Result {
             let data_raw = core::slice::from_raw_parts(ptr.add(9), RESULT_DATA_SIZE);
             let data = data_raw.try_into().unwrap();
 
-            Some(Result { success, error_code, data_len, data })
+            Some(Result {
+                success,
+                error_code,
+                data_len,
+                data,
+            })
         }
     }
 

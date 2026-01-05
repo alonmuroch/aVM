@@ -39,18 +39,18 @@ pub enum TrapMode {
 }
 
 /// Represents the Central Processing Unit (CPU) of our RISC-V virtual machine.
-/// 
+///
 /// EDUCATIONAL PURPOSE: This struct models the core components of a real CPU:
 /// - Program Counter (PC): Points to the next instruction to execute
 /// - Registers: Fast storage locations for temporary data
 /// - Verbose flag: For debugging and educational purposes
-/// 
+///
 /// RISC-V ARCHITECTURE NOTES:
 /// - RISC-V is a Reduced Instruction Set Computer (RISC) architecture
 /// - It has 32 general-purpose registers (x0-x31)
 /// - Register x0 is always hardwired to zero
 /// - The PC is separate from the general registers
-/// 
+///
 /// REAL CPU COMPARISON: This is a simplified model of a real CPU. In actual
 /// hardware, a CPU has many more components:
 /// - Arithmetic Logic Unit (ALU) for mathematical operations
@@ -58,7 +58,7 @@ pub enum TrapMode {
 /// - Cache memory for faster data access
 /// - Pipeline stages for parallel instruction processing
 /// - Memory Management Unit (MMU) for virtual memory
-/// 
+///
 /// VIRTUAL MACHINE CONTEXT: In a VM, we simulate these components in software.
 /// This allows us to run programs written for one architecture (RISC-V) on
 /// different hardware (like x86 or ARM). The VM provides an abstraction layer
@@ -77,7 +77,7 @@ pub struct CPU {
     /// EDUCATIONAL: In real CPUs, this is a special register that automatically
     /// increments after each instruction (unless the instruction changes it)
     pub pc: u32,
-    
+
     /// General-purpose registers (x0-x31)
     /// EDUCATIONAL: Registers are the fastest storage in a CPU, much faster than
     /// main memory. RISC-V has 32 registers, each holding a 32-bit value.
@@ -92,7 +92,7 @@ pub struct CPU {
     /// EDUCATIONAL: This implements the Load-Reserved/Store-Conditional
     /// mechanism for atomic memory operations in RISC-V
     pub reservation_addr: Option<VirtualAddress>,
-    
+
     /// Optional writer for verbose output
     /// If None, uses println! to console
     pub verbose_writer: Option<Rc<RefCell<dyn Write>>>,
@@ -125,10 +125,10 @@ impl std::fmt::Debug for CPU {
 
 impl CPU {
     /// Creates a new CPU instance with default values.
-    /// 
+    ///
     /// EDUCATIONAL PURPOSE: This demonstrates CPU initialization. In real systems,
     /// the CPU would be reset to a known state when powered on.
-    /// 
+    ///
     /// INITIALIZATION DETAILS:
     /// - PC starts at 0 (first instruction)
     /// - All registers start at 0 (except x0 which is always 0)
@@ -138,9 +138,7 @@ impl CPU {
     }
 
     /// Creates a new CPU instance with a custom metering implementation.
-    pub fn with_metering(
-        metering: Box<dyn Metering>,
-    ) -> Self {
+    pub fn with_metering(metering: Box<dyn Metering>) -> Self {
         Self {
             pc: 0,
             regs: [0; 32],
@@ -152,7 +150,7 @@ impl CPU {
             priv_mode: PrivilegeMode::Supervisor,
         }
     }
-    
+
     /// Sets a writer for verbose output
     pub fn set_verbose_writer(&mut self, writer: Rc<RefCell<dyn Write>>) {
         self.verbose_writer = Some(writer);
@@ -162,7 +160,7 @@ impl CPU {
     pub fn set_metering(&mut self, metering: Box<dyn Metering>) {
         self.metering = metering;
     }
-    
+
     /// Helper method to log output
     /// Only logs if verbose is true and self.verbose is enabled
     fn log(&self, message: &str, verbose: bool) {
@@ -170,7 +168,7 @@ impl CPU {
         if verbose && !self.verbose {
             return;
         }
-        
+
         match &self.verbose_writer {
             Some(writer) => {
                 let _ = write!(writer.borrow_mut(), "{}\n", message);
@@ -313,13 +311,13 @@ impl CPU {
     }
 
     /// Executes a single instruction cycle (fetch, decode, execute).
-    /// 
+    ///
     /// EDUCATIONAL PURPOSE: This is the heart of the CPU - the instruction cycle.
     /// Every CPU follows this basic pattern:
     /// 1. Fetch: Read the next instruction from memory
     /// 2. Decode: Figure out what the instruction does
     /// 3. Execute: Perform the operation
-    /// 
+    ///
     /// INSTRUCTION CYCLE DETAILS:
     /// - FETCH: The CPU reads the instruction from memory at the address
     ///   pointed to by the Program Counter (PC)
@@ -327,16 +325,16 @@ impl CPU {
     ///   to perform and what operands (registers, memory addresses) to use
     /// - EXECUTE: The actual operation is performed (arithmetic, memory access,
     ///   control flow, etc.)
-    /// 
+    ///
     /// ERROR HANDLING: If an invalid instruction is encountered, the CPU
     /// handles it gracefully by calling unknown_instruction() which provides
     /// debugging information and halts execution safely.
-    /// 
+    ///
     /// RETURN VALUE: Returns true if execution should continue, false to halt
-    /// 
+    ///
     /// MEMORY ACCESS: Uses shared references to memory to allow
     /// the CPU to read/write while maintaining Rust's safety guarantees.
-    /// 
+    ///
     /// REAL-WORLD ANALOGY: This is like a factory assembly line where each
     /// worker (instruction) performs a specific task. The conveyor belt (PC)
     /// moves to the next task automatically, unless a task specifically
@@ -344,7 +342,7 @@ impl CPU {
     pub fn step(&mut self, memory: Memory) -> bool {
         // EDUCATIONAL: Step 1 - Fetch and decode the next instruction
         let instr = self.next_instruction(Rc::clone(&memory));
-        
+
         // EDUCATIONAL: Step 2 - Execute the instruction or handle errors
         match instr {
             Some((instr, size)) => {
@@ -359,24 +357,19 @@ impl CPU {
     }
 
     /// Executes a single instruction and updates the program counter.
-    /// 
+    ///
     /// EDUCATIONAL PURPOSE: This function demonstrates instruction execution
     /// and program counter management. Some instructions (like branches and jumps)
     /// modify the PC directly, while others just increment it.
-    /// 
+    ///
     /// PC MANAGEMENT: The PC is only incremented if the instruction didn't
     /// change it. This handles branches, jumps, and calls correctly.
-    /// 
+    ///
     /// PARAMETERS:
     /// - instr: The decoded instruction to execute
     /// - size: Size of the instruction in bytes (2 for compressed, 4 for full)
     /// - memory: Shared reference to memory for load/store operations
-    fn run_instruction(
-        &mut self,
-        instr: Instruction,
-        size: u8,
-        memory: Memory,
-    ) -> bool {
+    fn run_instruction(&mut self, instr: Instruction, size: u8, memory: Memory) -> bool {
         // EDUCATIONAL: Debug output to help understand what's happening
         // Get the actual instruction bytes for debugging
         let pc_va = VirtualAddress(self.pc);
@@ -445,8 +438,10 @@ impl CPU {
     /// RETURN VALUE: This method always panics and never returns.
     fn unknown_instruction(&mut self, memory: Memory) -> ! {
         // EDUCATIONAL: Try to read the invalid instruction bytes for debugging
-        if let Some(slice_ref) = memory.mem_slice(VirtualAddress(self.pc), VirtualAddress(self.pc.wrapping_add(4)))
-        {
+        if let Some(slice_ref) = memory.mem_slice(
+            VirtualAddress(self.pc),
+            VirtualAddress(self.pc.wrapping_add(4)),
+        ) {
             // EDUCATIONAL: Convert bytes to hex for human-readable debugging
             let hex_dump = slice_ref
                 .iter()

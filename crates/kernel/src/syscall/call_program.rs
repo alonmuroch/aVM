@@ -1,9 +1,9 @@
 use clibc::logf;
-use types::{Address, ADDRESS_LEN};
+use types::{ADDRESS_LEN, Address};
 
 use crate::global::{CURRENT_TASK, MAX_INPUT_LEN, TASKS};
-use crate::syscall::storage::{caller_address_matches, current_task_root_ppn, read_user_bytes};
 use crate::syscall::SyscallContext;
+use crate::syscall::storage::{caller_address_matches, current_task_root_ppn, read_user_bytes};
 use crate::task::prep_program_task;
 use crate::user_program::with_program_image;
 
@@ -78,7 +78,10 @@ pub(crate) fn sys_call_program(args: [u32; 6], ctx: &mut SyscallContext<'_>) -> 
         let caller_task = match tasks.get_mut(caller_idx) {
             Some(task) => task,
             None => {
-                logf!("sys_call_program: missing caller task %d", caller_idx as u32);
+                logf!(
+                    "sys_call_program: missing caller task %d",
+                    caller_idx as u32
+                );
                 return 0;
             }
         };

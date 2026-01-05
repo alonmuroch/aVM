@@ -1,6 +1,6 @@
 //! Simple parser for reading typed values from a byte slice.
-use types::address::Address;
 use crate::vm_panic;
+use types::address::Address;
 
 pub struct DataParser<'a> {
     data: &'a [u8],
@@ -64,9 +64,7 @@ impl HexCodec {
 /// Convenience macro to parse a 40-hex-char string literal into an `Address`.
 #[macro_export]
 macro_rules! hex_address {
-    ($hex:literal) => {{
-        $crate::parser::HexCodec::decode_address_literal($hex.as_bytes())
-    }};
+    ($hex:literal) => {{ $crate::parser::HexCodec::decode_address_literal($hex.as_bytes()) }};
 }
 
 impl<'a> DataParser<'a> {

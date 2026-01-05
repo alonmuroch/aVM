@@ -1,8 +1,8 @@
-use kernel::{kernel_run_task, prep_program_task, PROGRAM_WINDOW_BYTES};
+use clibc::parser::HexCodec;
+use clibc::{log, logf};
 use kernel::global::TASKS;
 use kernel::user_program::with_program_image;
-use clibc::{log, logf};
-use clibc::parser::HexCodec;
+use kernel::{PROGRAM_WINDOW_BYTES, kernel_run_task, prep_program_task};
 use types::transaction::Transaction;
 
 pub(crate) fn program_call(tx: &Transaction, resume: extern "C" fn() -> !) {

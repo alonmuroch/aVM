@@ -1,5 +1,5 @@
 use crate::cpu::CPU;
-use crate::memory::{API, Memory};
+use crate::memory::{Memory, API};
 use crate::metering::Metering;
 use crate::registers::Register;
 use std::rc::Rc;
@@ -25,7 +25,6 @@ pub struct VM {
 
     /// Shared reference to the VM's memory (RAM)
     pub memory: Memory,
-
 }
 
 impl VM {

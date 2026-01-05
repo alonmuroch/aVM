@@ -4,21 +4,17 @@
 extern crate alloc;
 
 // Basic smoke test: init kernel test harness and emit logs.
-use core::slice;
 use clibc::log;
+use core::slice;
 use kernel::BootInfo;
 
-#[path = "../../tests/utils.rs"]
-mod utils;
 #[path = "../../tests/results.rs"]
 mod results;
+#[path = "../../tests/utils.rs"]
+mod utils;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn _start(
-    input_ptr: *const u8,
-    input_len: usize,
-    boot_info_ptr: *const BootInfo,
-) {
+pub extern "C" fn _start(input_ptr: *const u8, input_len: usize, boot_info_ptr: *const BootInfo) {
     log!("kernel test boot");
     let _info = utils::init_test_kernel(boot_info_ptr);
 

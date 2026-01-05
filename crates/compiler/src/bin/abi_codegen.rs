@@ -1,17 +1,23 @@
+use compiler::abi_codegen::AbiCodeGenerator;
 use std::env;
 use std::fs;
 use std::path::Path;
-use compiler::abi_codegen::AbiCodeGenerator;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    
+
     if args.len() < 3 {
-        eprintln!("Usage: {} <abi-file> <output-file> [contract-name]", args[0]);
-        eprintln!("Example: {} simple.abi.json simple_client.rs SimpleContract", args[0]);
+        eprintln!(
+            "Usage: {} <abi-file> <output-file> [contract-name]",
+            args[0]
+        );
+        eprintln!(
+            "Example: {} simple.abi.json simple_client.rs SimpleContract",
+            args[0]
+        );
         std::process::exit(1);
     }
-    
+
     let abi_file = &args[1];
     let output_file = &args[2];
     let contract_name = if args.len() > 3 {
@@ -25,9 +31,12 @@ fn main() {
             .map(|s| format!("{}Contract", capitalize_first(&s)))
             .unwrap_or_else(|| "Contract".to_string())
     };
-    
-    println!("Generating client code for {} as {}", abi_file, contract_name);
-    
+
+    println!(
+        "Generating client code for {} as {}",
+        abi_file, contract_name
+    );
+
     match AbiCodeGenerator::from_abi_file(abi_file, contract_name) {
         Ok(code) => {
             if let Err(e) = fs::write(output_file, code) {

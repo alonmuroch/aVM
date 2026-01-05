@@ -196,8 +196,7 @@ fn build_erc20_bundle() -> Result<TransactionBundle, String> {
             data: encode_router_calls(&[HostFuncCall {
                 selector: 0x02,
                 args: (|| {
-                    let to_addr =
-                        to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d2");
+                    let to_addr = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d2");
                     let mut args = to_addr.0.to_vec();
                     let amount: u32 = 50000000;
                     args.extend(amount.to_le_bytes());
@@ -214,8 +213,7 @@ fn build_erc20_bundle() -> Result<TransactionBundle, String> {
             data: encode_router_calls(&[HostFuncCall {
                 selector: 0x05,
                 args: (|| {
-                    let owner =
-                        to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0");
+                    let owner = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0");
                     owner.0.to_vec()
                 })(),
             }]),
@@ -345,8 +343,7 @@ fn build_allocator_demo_bundle() -> Result<TransactionBundle, String> {
             to: addr,
             from: addr,
             data: vec![
-                12, 0, 0, 0, 15, 0, 0, 0, 100, 0, 0, 0, 95, 0, 0, 0, 87, 0, 0, 0, 92, 0,
-                0, 0,
+                12, 0, 0, 0, 15, 0, 0, 0, 100, 0, 0, 0, 95, 0, 0, 0, 87, 0, 0, 0, 92, 0, 0, 0,
             ],
             value: 0,
             nonce: 0,
@@ -515,7 +512,8 @@ fn build_ecdsa_verify_bundle() -> Result<TransactionBundle, String> {
 }
 
 fn build_ecdsa_payload() -> Vec<u8> {
-    let mut payload = Vec::with_capacity(1 + ECDSA_PK_BYTES.len() + ECDSA_SIG_BYTES.len() + ECDSA_HASH.len());
+    let mut payload =
+        Vec::with_capacity(1 + ECDSA_PK_BYTES.len() + ECDSA_SIG_BYTES.len() + ECDSA_HASH.len());
     payload.push(ECDSA_PK_BYTES.len() as u8);
     payload.extend_from_slice(&ECDSA_PK_BYTES);
     payload.extend_from_slice(&ECDSA_SIG_BYTES);
@@ -541,8 +539,8 @@ const ECDSA_SIG_BYTES: [u8; 64] = [
 
 fn get_program_code(name: &str) -> Result<Vec<u8>, String> {
     let bytes = read_example_bin(name)?;
-    let elf = parse_elf_from_bytes(&bytes)
-        .map_err(|e| format!("failed to parse elf for {name}: {e}"))?;
+    let elf =
+        parse_elf_from_bytes(&bytes).map_err(|e| format!("failed to parse elf for {name}: {e}"))?;
 
     let (code, code_start) = elf
         .get_flat_code()
@@ -566,11 +564,7 @@ fn get_program_code(name: &str) -> Result<Vec<u8>, String> {
 fn read_example_bin(name: &str) -> Result<Vec<u8>, String> {
     let base = workspace_root().join("crates/examples/bin");
     let mut candidates = vec![base.join(name), base.join(format!("{name}.elf"))];
-    candidates.push(
-        workspace_root()
-            .join("target/avm32/release")
-            .join(name),
-    );
+    candidates.push(workspace_root().join("target/avm32/release").join(name));
 
     for path in candidates {
         if path.exists() {

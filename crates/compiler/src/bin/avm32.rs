@@ -88,11 +88,7 @@ fn cmd_build(args: Vec<String>, paths: &Paths) -> Result<(), String> {
             }
             "--features" => {
                 i += 1;
-                features = Some(
-                    args.get(i)
-                        .cloned()
-                        .ok_or("missing value for --features")?,
-                );
+                features = Some(args.get(i).cloned().ok_or("missing value for --features")?);
             }
             "--debug" => release = false,
             "--release" => release = true,
@@ -103,17 +99,22 @@ fn cmd_build(args: Vec<String>, paths: &Paths) -> Result<(), String> {
             }
             "--cargo" => {
                 i += 1;
-                cargo_cmd =
-                    Some(args.get(i).cloned().ok_or("missing value for --cargo")?);
+                cargo_cmd = Some(args.get(i).cloned().ok_or("missing value for --cargo")?);
             }
             "--manifest-path" => {
                 i += 1;
-                let val = args.get(i).cloned().ok_or("missing value for --manifest-path")?;
+                let val = args
+                    .get(i)
+                    .cloned()
+                    .ok_or("missing value for --manifest-path")?;
                 manifest_path = Some(PathBuf::from(val));
             }
             "--linker-script" => {
                 i += 1;
-                let val = args.get(i).cloned().ok_or("missing value for --linker-script")?;
+                let val = args
+                    .get(i)
+                    .cloned()
+                    .ok_or("missing value for --linker-script")?;
                 linker_script = Some(PathBuf::from(val));
             }
             other => return Err(format!("unknown flag {}", other)),
@@ -147,23 +148,13 @@ fn cmd_build(args: Vec<String>, paths: &Paths) -> Result<(), String> {
     rustflags.push_str("-Clink-arg=-T");
     let linker = linker_script.unwrap_or_else(|| paths.linker_script.clone());
     if !linker.exists() {
-        return Err(format!(
-            "linker script {} does not exist",
-            linker.display()
-        ));
+        return Err(format!("linker script {} does not exist", linker.display()));
     }
-    rustflags.push_str(
-        &linker
-            .to_str()
-            .ok_or("invalid linker script path")?,
-    );
+    rustflags.push_str(&linker.to_str().ok_or("invalid linker script path")?);
 
     // Split cargo command to support "+nightly" prefixes
     let mut parts = cargo.split_whitespace();
-    let cmd = parts
-        .next()
-        .ok_or("invalid cargo command")?
-        .to_string();
+    let cmd = parts.next().ok_or("invalid cargo command")?.to_string();
     let mut cargo_args: Vec<String> = parts.map(|s| s.to_string()).collect();
     cargo_args.push("build".to_string());
     cargo_args.push("--manifest-path".to_string());
@@ -187,7 +178,10 @@ fn cmd_build(args: Vec<String>, paths: &Paths) -> Result<(), String> {
         .map_err(|e| format!("failed to run cargo: {}", e))?;
 
     if !status.success() {
-        return Err(format!("cargo build failed with status {:?}", status.code()));
+        return Err(format!(
+            "cargo build failed with status {:?}",
+            status.code()
+        ));
     }
 
     let target_dir = paths
@@ -197,15 +191,18 @@ fn cmd_build(args: Vec<String>, paths: &Paths) -> Result<(), String> {
         .join(if release { "release" } else { "debug" });
     let built = target_dir.join(&bin);
     if !built.exists() {
-        return Err(format!(
-            "expected built artifact at {}",
-            built.display()
-        ));
+        return Err(format!("expected built artifact at {}", built.display()));
     }
 
     let dest = out_dir.join(format!("{}.elf", bin));
-    fs::copy(&built, &dest)
-        .map_err(|e| format!("failed to copy {} to {}: {}", built.display(), dest.display(), e))?;
+    fs::copy(&built, &dest).map_err(|e| {
+        format!(
+            "failed to copy {} to {}: {}",
+            built.display(),
+            dest.display(),
+            e
+        )
+    })?;
 
     println!("✓ Built {} -> {}", bin, dest.display());
     Ok(())
@@ -236,7 +233,10 @@ fn cmd_abi(args: Vec<String>, paths: &Paths) -> Result<(), String> {
             }
             "--manifest-path" => {
                 i += 1;
-                let val = args.get(i).cloned().ok_or("missing value for --manifest-path")?;
+                let val = args
+                    .get(i)
+                    .cloned()
+                    .ok_or("missing value for --manifest-path")?;
                 manifest_path = Some(PathBuf::from(val));
             }
             other => return Err(format!("unknown flag {}", other)),
@@ -265,18 +265,18 @@ fn cmd_abi(args: Vec<String>, paths: &Paths) -> Result<(), String> {
         (name, inferred)
     };
 
-    let output = out.unwrap_or_else(|| manifest_dir.join("bin").join(format!("{}.abi.json", bin_name)));
-    let source =
-        fs::read_to_string(&src_path).map_err(|e| format!("failed to read {}: {}", src_path.display(), e))?;
+    let output = out.unwrap_or_else(|| {
+        manifest_dir
+            .join("bin")
+            .join(format!("{}.abi.json", bin_name))
+    });
+    let source = fs::read_to_string(&src_path)
+        .map_err(|e| format!("failed to read {}: {}", src_path.display(), e))?;
 
     let mut generator = AbiGenerator::new(source);
     let abi = generator.generate();
-    fs::create_dir_all(
-        output
-            .parent()
-            .ok_or("invalid output path for abi")?,
-    )
-    .map_err(|e| e.to_string())?;
+    fs::create_dir_all(output.parent().ok_or("invalid output path for abi")?)
+        .map_err(|e| e.to_string())?;
     fs::write(&output, abi.to_json())
         .map_err(|e| format!("failed to write {}: {}", output.display(), e))?;
 
@@ -326,17 +326,14 @@ fn cmd_client(args: Vec<String>, _paths: &Paths) -> Result<(), String> {
     let contract_name = contract.unwrap_or_else(|| derive_contract_name(&abi_path));
 
     let code = AbiCodeGenerator::from_abi_file(
-        abi_path
-            .to_str()
-            .ok_or("invalid abi path")?,
+        abi_path.to_str().ok_or("invalid abi path")?,
         contract_name,
     )
     .map_err(|e| format!("failed to generate client: {}", e))?;
 
     fs::create_dir_all(out.parent().ok_or("invalid output path for client")?)
         .map_err(|e| e.to_string())?;
-    fs::write(&out, code)
-        .map_err(|e| format!("failed to write {}: {}", out.display(), e))?;
+    fs::write(&out, code).map_err(|e| format!("failed to write {}: {}", out.display(), e))?;
 
     println!("✓ Generated client {}", out.display());
     Ok(())
@@ -365,20 +362,18 @@ fn cmd_all(args: Vec<String>, paths: &Paths) -> Result<(), String> {
             }
             "--cargo" => {
                 i += 1;
-                cargo_cmd =
-                    Some(args.get(i).cloned().ok_or("missing value for --cargo")?);
+                cargo_cmd = Some(args.get(i).cloned().ok_or("missing value for --cargo")?);
             }
             "--features" => {
                 i += 1;
-                features = Some(
-                    args.get(i)
-                        .cloned()
-                        .ok_or("missing value for --features")?,
-                );
+                features = Some(args.get(i).cloned().ok_or("missing value for --features")?);
             }
             "--manifest-path" => {
                 i += 1;
-                let val = args.get(i).cloned().ok_or("missing value for --manifest-path")?;
+                let val = args
+                    .get(i)
+                    .cloned()
+                    .ok_or("missing value for --manifest-path")?;
                 manifest_path = Some(PathBuf::from(val));
             }
             "--src" => {
@@ -388,7 +383,10 @@ fn cmd_all(args: Vec<String>, paths: &Paths) -> Result<(), String> {
             }
             "--linker-script" => {
                 i += 1;
-                let val = args.get(i).cloned().ok_or("missing value for --linker-script")?;
+                let val = args
+                    .get(i)
+                    .cloned()
+                    .ok_or("missing value for --linker-script")?;
                 linker_script = Some(PathBuf::from(val));
             }
             other => return Err(format!("unknown flag {}", other)),

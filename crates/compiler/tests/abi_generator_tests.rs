@@ -1,4 +1,6 @@
-use compiler::{AbiGenerator, ContractAbi, EventAbi, EventParam, FunctionAbi, FunctionParam, ParamType};
+use compiler::{
+    AbiGenerator, ContractAbi, EventAbi, EventParam, FunctionAbi, FunctionParam, ParamType,
+};
 
 #[test]
 fn test_abi_generation() {
@@ -22,7 +24,7 @@ fn test_abi_generation() {
     assert_eq!(abi.events.len(), 2);
     assert_eq!(abi.events[0].name, "Minted");
     assert_eq!(abi.events[1].name, "Transfer");
-    
+
     println!("Generated ABI: {}", abi.to_json());
 }
 
@@ -66,23 +68,27 @@ fn test_function_extraction() {
             0
         }
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
+
     assert_eq!(abi.functions.len(), 3);
-    
+
     // Check that all expected functions are found
     let function_names: Vec<&str> = abi.functions.iter().map(|f| f.name.as_str()).collect();
     assert!(function_names.contains(&"init"));
     assert!(function_names.contains(&"transfer"));
     assert!(function_names.contains(&"balance_of"));
-    
+
     // Check selectors
     let init_func = abi.functions.iter().find(|f| f.name == "init").unwrap();
     let transfer_func = abi.functions.iter().find(|f| f.name == "transfer").unwrap();
-    let balance_func = abi.functions.iter().find(|f| f.name == "balance_of").unwrap();
-    
+    let balance_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "balance_of")
+        .unwrap();
+
     assert_eq!(init_func.selector, 1);
     assert_eq!(transfer_func.selector, 2);
     assert_eq!(balance_func.selector, 5);
@@ -99,15 +105,15 @@ fn test_multi_line_event_parsing() {
             metadata => String,
         });
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
+
     assert_eq!(abi.events.len(), 1);
     let event = &abi.events[0];
     assert_eq!(event.name, "ComplexEvent");
     assert_eq!(event.inputs.len(), 4);
-    
+
     // Check parameter types
     assert_eq!(event.inputs[0].name, "user");
     assert!(matches!(event.inputs[0].kind, ParamType::Address));
@@ -127,10 +133,10 @@ fn test_empty_program() {
             // Just a simple function
         }
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
+
     assert_eq!(abi.events.len(), 0);
     assert_eq!(abi.functions.len(), 0);
 }
@@ -139,7 +145,7 @@ fn test_empty_program() {
 fn test_contract_abi_json_generation() {
     // Test complete ABI JSON generation
     let mut abi = ContractAbi::new();
-    
+
     // Add an event
     abi.add_event(EventAbi {
         name: "TestEvent".to_string(),
@@ -156,22 +162,20 @@ fn test_contract_abi_json_generation() {
             },
         ],
     });
-    
+
     // Add a function
     abi.add_function(FunctionAbi {
         name: "testFunction".to_string(),
         selector: 1,
-        inputs: vec![
-            FunctionParam {
-                name: "input1".to_string(),
-                kind: ParamType::Address,
-            },
-        ],
+        inputs: vec![FunctionParam {
+            name: "input1".to_string(),
+            kind: ParamType::Address,
+        }],
         outputs: vec![ParamType::Uint(32)],
     });
-    
+
     let json = abi.to_json();
-    
+
     // Verify JSON contains expected content
     assert!(json.contains("\"name\": \"TestEvent\""));
     assert!(json.contains("\"name\": \"testFunction\""));
@@ -234,28 +238,32 @@ fn test_real_erc20_like_program() {
             0
         }
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
+
     // Check events
     assert_eq!(abi.events.len(), 2);
     let event_names: Vec<&str> = abi.events.iter().map(|e| e.name.as_str()).collect();
     assert!(event_names.contains(&"Transfer"));
     assert!(event_names.contains(&"Minted"));
-    
+
     // Check functions
     assert_eq!(abi.functions.len(), 3);
     let function_names: Vec<&str> = abi.functions.iter().map(|f| f.name.as_str()).collect();
     assert!(function_names.contains(&"init"));
     assert!(function_names.contains(&"transfer"));
     assert!(function_names.contains(&"balance_of"));
-    
+
     // Check selectors
     let init_func = abi.functions.iter().find(|f| f.name == "init").unwrap();
     let transfer_func = abi.functions.iter().find(|f| f.name == "transfer").unwrap();
-    let balance_func = abi.functions.iter().find(|f| f.name == "balance_of").unwrap();
-    
+    let balance_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "balance_of")
+        .unwrap();
+
     assert_eq!(init_func.selector, 1);
     assert_eq!(transfer_func.selector, 2);
     assert_eq!(balance_func.selector, 5);
@@ -313,20 +321,20 @@ fn test_function_input_extraction() {
             })
         }
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
+
     // Check that all functions have the correct inputs
     assert_eq!(abi.functions.len(), 3);
-    
+
     // Check init function
     let init_func = abi.functions.iter().find(|f| f.name == "init").unwrap();
     // The generator drops the implicit `caller` argument; only routed args remain.
     assert_eq!(init_func.inputs.len(), 1);
     assert_eq!(init_func.inputs[0].name, "args");
     assert!(matches!(init_func.inputs[0].kind, ParamType::Bytes));
-    
+
     // Check transfer function
     let transfer_func = abi.functions.iter().find(|f| f.name == "transfer").unwrap();
     assert_eq!(transfer_func.inputs.len(), 2);
@@ -334,9 +342,13 @@ fn test_function_input_extraction() {
     assert!(matches!(transfer_func.inputs[0].kind, ParamType::Address));
     assert_eq!(transfer_func.inputs[1].name, "amount");
     assert!(matches!(transfer_func.inputs[1].kind, ParamType::Uint(32)));
-    
+
     // Check balance_of function
-    let balance_func = abi.functions.iter().find(|f| f.name == "balance_of").unwrap();
+    let balance_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "balance_of")
+        .unwrap();
     assert_eq!(balance_func.inputs.len(), 1);
     assert_eq!(balance_func.inputs[0].name, "owner");
     assert!(matches!(balance_func.inputs[0].kind, ParamType::Address));
@@ -372,20 +384,20 @@ fn test_function_signature_parsing() {
             0
         }
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let _abi = generator.generate();
-    
+
     // Since these functions aren't called in the router, they won't be included
     // But we can test the signature parsing directly
     let lines: Vec<&str> = source_code.lines().collect();
-    
+
     // Test simple_function
     if let Some(signature) = generator.extract_function_signature(&lines, 1) {
         let func = generator.parse_function_signature("simple_function", signature);
         assert_eq!(func.inputs.len(), 0);
     }
-    
+
     // Test single_param
     if let Some(signature) = generator.extract_function_signature(&lines, 5) {
         let func = generator.parse_function_signature("single_param", signature);
@@ -393,7 +405,7 @@ fn test_function_signature_parsing() {
         assert_eq!(func.inputs[0].name, "param");
         assert!(matches!(func.inputs[0].kind, ParamType::Uint(32)));
     }
-    
+
     // Test multiple_params
     if let Some(signature) = generator.extract_function_signature(&lines, 9) {
         let func = generator.parse_function_signature("multiple_params", signature);
@@ -405,7 +417,7 @@ fn test_function_signature_parsing() {
         assert_eq!(func.inputs[2].name, "c");
         assert!(matches!(func.inputs[2].kind, ParamType::Bool));
     }
-    
+
     // Test with_return_type
     if let Some(signature) = generator.extract_function_signature(&lines, 13) {
         let func = generator.parse_function_signature("with_return_type", signature);
@@ -420,21 +432,48 @@ fn test_function_signature_parsing() {
 #[test]
 fn test_param_type_parsing() {
     let generator = AbiGenerator::new("".to_string());
-    
+
     // Test basic types
-    assert_eq!(generator.parse_param_type_from_str("Address"), Some(ParamType::Address));
-    assert_eq!(generator.parse_param_type_from_str("u32"), Some(ParamType::Uint(32)));
-    assert_eq!(generator.parse_param_type_from_str("u64"), Some(ParamType::Uint(64)));
-    assert_eq!(generator.parse_param_type_from_str("bool"), Some(ParamType::Bool));
-    assert_eq!(generator.parse_param_type_from_str("&[u8]"), Some(ParamType::Bytes));
-    assert_eq!(generator.parse_param_type_from_str("String"), Some(ParamType::String));
-    assert_eq!(generator.parse_param_type_from_str("Result"), Some(ParamType::Result));
-    
+    assert_eq!(
+        generator.parse_param_type_from_str("Address"),
+        Some(ParamType::Address)
+    );
+    assert_eq!(
+        generator.parse_param_type_from_str("u32"),
+        Some(ParamType::Uint(32))
+    );
+    assert_eq!(
+        generator.parse_param_type_from_str("u64"),
+        Some(ParamType::Uint(64))
+    );
+    assert_eq!(
+        generator.parse_param_type_from_str("bool"),
+        Some(ParamType::Bool)
+    );
+    assert_eq!(
+        generator.parse_param_type_from_str("&[u8]"),
+        Some(ParamType::Bytes)
+    );
+    assert_eq!(
+        generator.parse_param_type_from_str("String"),
+        Some(ParamType::String)
+    );
+    assert_eq!(
+        generator.parse_param_type_from_str("Result"),
+        Some(ParamType::Result)
+    );
+
     // Test edge cases
     assert_eq!(generator.parse_param_type_from_str(""), None);
     assert_eq!(generator.parse_param_type_from_str("unknown"), None);
-    assert_eq!(generator.parse_param_type_from_str("u32 "), Some(ParamType::Uint(32))); // with space
-    assert_eq!(generator.parse_param_type_from_str(" u32"), Some(ParamType::Uint(32))); // with leading space
+    assert_eq!(
+        generator.parse_param_type_from_str("u32 "),
+        Some(ParamType::Uint(32))
+    ); // with space
+    assert_eq!(
+        generator.parse_param_type_from_str(" u32"),
+        Some(ParamType::Uint(32))
+    ); // with leading space
 }
 
 #[test]
@@ -460,12 +499,12 @@ fn test_edge_case_router_patterns() {
             })
         }
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
+
     assert_eq!(abi.functions.len(), 3);
-    
+
     // Check that all functions were found despite comments
     let function_names: Vec<String> = abi.functions.iter().map(|f| f.name.clone()).collect();
     assert!(function_names.contains(&"test_function".to_string()));
@@ -491,27 +530,43 @@ fn test_malformed_function_signatures() {
             })
         }
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
+
     // Should find all functions regardless of signature complexity
     assert_eq!(abi.functions.len(), 4);
-    
+
     // Check specific function signatures
-    let valid_func = abi.functions.iter().find(|f| f.name == "valid_function").unwrap();
+    let valid_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "valid_function")
+        .unwrap();
     assert_eq!(valid_func.inputs.len(), 2);
     assert_eq!(valid_func.outputs.len(), 1);
-    
-    let no_params_func = abi.functions.iter().find(|f| f.name == "no_params").unwrap();
+
+    let no_params_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "no_params")
+        .unwrap();
     assert_eq!(no_params_func.inputs.len(), 0);
     assert_eq!(no_params_func.outputs.len(), 0); // void function
-    
-    let missing_return_func = abi.functions.iter().find(|f| f.name == "missing_return_type").unwrap();
+
+    let missing_return_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "missing_return_type")
+        .unwrap();
     assert_eq!(missing_return_func.inputs.len(), 1);
     assert_eq!(missing_return_func.outputs.len(), 0); // void function
-    
-    let complex_return_func = abi.functions.iter().find(|f| f.name == "complex_return").unwrap();
+
+    let complex_return_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "complex_return")
+        .unwrap();
     assert_eq!(complex_return_func.inputs.len(), 0);
     assert_eq!(complex_return_func.outputs.len(), 1);
     assert!(matches!(complex_return_func.outputs[0], ParamType::Result));
@@ -546,13 +601,17 @@ fn test_multiline_function_signatures() {
             })
         }
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
+
     assert_eq!(abi.functions.len(), 2);
-    
-    let complex_func = abi.functions.iter().find(|f| f.name == "complex_function").unwrap();
+
+    let complex_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "complex_function")
+        .unwrap();
     // Caller is implicit; ABI includes routed args only.
     assert_eq!(complex_func.inputs.len(), 3);
     assert_eq!(complex_func.inputs[0].name, "args");
@@ -563,8 +622,12 @@ fn test_multiline_function_signatures() {
     assert!(matches!(complex_func.inputs[2].kind, ParamType::Uint(64)));
     assert_eq!(complex_func.outputs.len(), 1);
     assert!(matches!(complex_func.outputs[0], ParamType::Result));
-    
-    let another_func = abi.functions.iter().find(|f| f.name == "another_function").unwrap();
+
+    let another_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "another_function")
+        .unwrap();
     assert_eq!(another_func.inputs.len(), 2);
     assert_eq!(another_func.outputs.len(), 1);
     assert!(matches!(another_func.outputs[0], ParamType::Uint(32)));
@@ -600,10 +663,10 @@ fn test_different_router_patterns() {
             })
         }
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
+
     // The router pattern with nested calls might find more functions than expected
     // Let's check that at least the main functions were found
     let function_names: Vec<String> = abi.functions.iter().map(|f| f.name.clone()).collect();
@@ -641,26 +704,42 @@ fn test_result_type_handling() {
             })
         }
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
+
     assert_eq!(abi.functions.len(), 4);
-    
+
     // Check Result return types
-    let success_func = abi.functions.iter().find(|f| f.name == "success_result").unwrap();
+    let success_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "success_result")
+        .unwrap();
     assert_eq!(success_func.outputs.len(), 1);
     assert!(matches!(success_func.outputs[0], ParamType::Result));
-    
-    let error_func = abi.functions.iter().find(|f| f.name == "error_result").unwrap();
+
+    let error_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "error_result")
+        .unwrap();
     assert_eq!(error_func.outputs.len(), 1);
     assert!(matches!(error_func.outputs[0], ParamType::Result));
-    
-    let data_func = abi.functions.iter().find(|f| f.name == "data_result").unwrap();
+
+    let data_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "data_result")
+        .unwrap();
     assert_eq!(data_func.outputs.len(), 1);
     assert!(matches!(data_func.outputs[0], ParamType::Result));
-    
-    let void_func = abi.functions.iter().find(|f| f.name == "void_function").unwrap();
+
+    let void_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "void_function")
+        .unwrap();
     assert_eq!(void_func.outputs.len(), 0); // void function
 }
 
@@ -687,31 +766,31 @@ fn test_complex_parameter_types() {
             })
         }
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
+
     assert_eq!(abi.functions.len(), 1);
-    
+
     let func = &abi.functions[0];
     assert_eq!(func.inputs.len(), 6);
-    
+
     // Check parameter types
     assert_eq!(func.inputs[0].name, "addr");
     assert!(matches!(func.inputs[0].kind, ParamType::Address));
-    
+
     assert_eq!(func.inputs[1].name, "num");
     assert!(matches!(func.inputs[1].kind, ParamType::Uint(32)));
-    
+
     assert_eq!(func.inputs[2].name, "flag");
     assert!(matches!(func.inputs[2].kind, ParamType::Bool));
-    
+
     assert_eq!(func.inputs[3].name, "data");
     assert!(matches!(func.inputs[3].kind, ParamType::Bytes));
-    
+
     assert_eq!(func.inputs[4].name, "text");
     assert!(matches!(func.inputs[4].kind, ParamType::String));
-    
+
     assert_eq!(func.inputs[5].name, "result");
     assert!(matches!(func.inputs[5].kind, ParamType::Result));
 }
@@ -723,7 +802,7 @@ fn test_empty_and_malformed_programs() {
     let empty_abi = empty_generator.generate();
     assert_eq!(empty_abi.functions.len(), 0);
     assert_eq!(empty_abi.events.len(), 0);
-    
+
     // Test program with no router
     let no_router_source = r#"
         fn some_function() -> u32 { 0 }
@@ -732,7 +811,7 @@ fn test_empty_and_malformed_programs() {
     let mut no_router_generator = AbiGenerator::new(no_router_source.to_string());
     let no_router_abi = no_router_generator.generate();
     assert_eq!(no_router_abi.functions.len(), 0); // No functions without router
-    
+
     // Test malformed router
     let malformed_source = r#"
         fn test_function() -> u32 { 0 }
@@ -775,40 +854,66 @@ fn test_event_edge_cases() {
             })
         }
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
 
-    
     // The event parsing might find fewer events than expected due to parsing limitations
     assert!(abi.events.len() >= 2);
-    
+
     // Check multiple fields event
-    let multiple_event = abi.events.iter().find(|e| e.name == "MultipleFields").unwrap();
+    let multiple_event = abi
+        .events
+        .iter()
+        .find(|e| e.name == "MultipleFields")
+        .unwrap();
     assert_eq!(multiple_event.inputs.len(), 5);
-    
-    let field_names: Vec<String> = multiple_event.inputs.iter().map(|f| f.name.clone()).collect();
+
+    let field_names: Vec<String> = multiple_event
+        .inputs
+        .iter()
+        .map(|f| f.name.clone())
+        .collect();
     assert!(field_names.contains(&"sender".to_string()));
     assert!(field_names.contains(&"amount".to_string()));
     assert!(field_names.contains(&"success".to_string()));
     assert!(field_names.contains(&"data".to_string()));
     assert!(field_names.contains(&"message".to_string()));
-    
+
     // Check field types
-    let sender_field = multiple_event.inputs.iter().find(|f| f.name == "sender").unwrap();
+    let sender_field = multiple_event
+        .inputs
+        .iter()
+        .find(|f| f.name == "sender")
+        .unwrap();
     assert!(matches!(sender_field.kind, ParamType::Address));
-    
-    let amount_field = multiple_event.inputs.iter().find(|f| f.name == "amount").unwrap();
+
+    let amount_field = multiple_event
+        .inputs
+        .iter()
+        .find(|f| f.name == "amount")
+        .unwrap();
     assert!(matches!(amount_field.kind, ParamType::Uint(64)));
-    
-    let success_field = multiple_event.inputs.iter().find(|f| f.name == "success").unwrap();
+
+    let success_field = multiple_event
+        .inputs
+        .iter()
+        .find(|f| f.name == "success")
+        .unwrap();
     assert!(matches!(success_field.kind, ParamType::Bool));
-    
-    let data_field = multiple_event.inputs.iter().find(|f| f.name == "data").unwrap();
+
+    let data_field = multiple_event
+        .inputs
+        .iter()
+        .find(|f| f.name == "data")
+        .unwrap();
     assert!(matches!(data_field.kind, ParamType::Bytes));
-    
-    let message_field = multiple_event.inputs.iter().find(|f| f.name == "message").unwrap();
+
+    let message_field = multiple_event
+        .inputs
+        .iter()
+        .find(|f| f.name == "message")
+        .unwrap();
     assert!(matches!(message_field.kind, ParamType::String));
 }
 
@@ -847,7 +952,11 @@ fn test_erc20_example_file_generates_typed_abi() {
     assert_eq!(approve_func.inputs[1].name, "amount");
     assert!(matches!(approve_func.inputs[1].kind, ParamType::Uint(32)));
 
-    let transfer_from = abi.functions.iter().find(|f| f.name == "transfer_from").unwrap();
+    let transfer_from = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "transfer_from")
+        .unwrap();
     assert_eq!(transfer_from.selector, 4);
     assert_eq!(transfer_from.inputs.len(), 3);
     assert_eq!(transfer_from.inputs[0].name, "from");
@@ -857,7 +966,11 @@ fn test_erc20_example_file_generates_typed_abi() {
     assert_eq!(transfer_from.inputs[2].name, "amount");
     assert!(matches!(transfer_from.inputs[2].kind, ParamType::Uint(32)));
 
-    let balance_func = abi.functions.iter().find(|f| f.name == "balance_of").unwrap();
+    let balance_func = abi
+        .functions
+        .iter()
+        .find(|f| f.name == "balance_of")
+        .unwrap();
     assert_eq!(balance_func.selector, 5);
     assert_eq!(balance_func.inputs.len(), 1);
     assert_eq!(balance_func.inputs[0].name, "owner");

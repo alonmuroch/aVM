@@ -60,11 +60,6 @@ path = "src/ecdsa_verify.rs"
 required-features = ["binaries"]
 
 [[bin]]
-name = "ec_mul_test"
-path = "src/ec_mul_test.rs"
-required-features = ["binaries"]
-
-[[bin]]
 name = "native_transfer"
 path = "src/native_transfer.rs"
 required-features = ["binaries"]

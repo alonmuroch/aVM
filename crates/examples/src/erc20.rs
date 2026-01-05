@@ -3,8 +3,10 @@
 
 extern crate clibc;
 use clibc::{
-    DataParser, Map, StorageKey, entrypoint, event, fire_event, logf, persist_struct,
-    require, router::route, types::{address::Address, o::O, result::Result}, vm_panic,
+    DataParser, Map, StorageKey, entrypoint, event, fire_event, logf, persist_struct, require,
+    router::route,
+    types::{address::Address, o::O, result::Result},
+    vm_panic,
 };
 
 // Persistent structs
@@ -146,13 +148,7 @@ fn approve(program: &Address, caller: Address, spender: Address, amount: u32) {
     Allowances::set(program, key, amount);
 }
 
-fn transfer_from(
-    program: &Address,
-    caller: Address,
-    from: Address,
-    to: Address,
-    amount: u32,
-) {
+fn transfer_from(program: &Address, caller: Address, from: Address, to: Address, amount: u32) {
     let allowance = match Allowances::get(program, AllowanceKey::new(from, caller)) {
         O::Some(val) => val,
         O::None => 0,

@@ -1,8 +1,8 @@
 use core::mem;
 
+use state::State;
 use types::kernel_result::KERNEL_RESULT_ADDR;
 use types::{KernelResult, TransactionReceipt};
-use state::State;
 use vm::memory::{Memory as MmuRef, VirtualAddress};
 
 pub struct KernelRunResult {
@@ -29,18 +29,13 @@ pub(crate) fn read_kernel_result(memory: &MmuRef) -> Option<KernelRunResult> {
         return None;
     }
     let receipts_end = receipts_ptr.checked_add(receipts_len)?;
-    let receipts_slice = memory.mem_slice(
-        VirtualAddress(receipts_ptr),
-        VirtualAddress(receipts_end),
-    )?;
+    let receipts_slice =
+        memory.mem_slice(VirtualAddress(receipts_ptr), VirtualAddress(receipts_end))?;
     let receipts = TransactionReceipt::decode_list(receipts_slice.as_ref())?;
 
     let state = if state_ptr != 0 && state_len != 0 {
         let state_end = state_ptr.checked_add(state_len)?;
-        let state_slice = memory.mem_slice(
-            VirtualAddress(state_ptr),
-            VirtualAddress(state_end),
-        )?;
+        let state_slice = memory.mem_slice(VirtualAddress(state_ptr), VirtualAddress(state_end))?;
         State::decode(state_slice.as_ref())
     } else {
         None

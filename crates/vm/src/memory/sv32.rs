@@ -8,7 +8,7 @@ use types::{
     SV32_PTE_W, SV32_PTE_X, SV32_SATP_PPN_MASK,
 };
 
-use super::{API, MMU, Perms, VirtualAddress};
+use super::{Perms, VirtualAddress, API, MMU};
 
 /// Software Sv32 MMU backed by a contiguous physical buffer.
 ///
@@ -126,9 +126,7 @@ impl Sv32Memory {
 
     fn write_pte(&self, phys_addr: usize, val: u32) {
         let mut backing = self.backing.borrow_mut();
-        let end = phys_addr
-            .checked_add(4)
-            .expect("pte write offset overflow");
+        let end = phys_addr.checked_add(4).expect("pte write offset overflow");
         if end > backing.len() {
             panic!("pte write out of bounds");
         }
@@ -202,9 +200,9 @@ impl Sv32Memory {
             MemoryAccessKind::Load | MemoryAccessKind::ReservationLoad => {
                 l2_pte & (SV32_PTE_R | SV32_PTE_X) != 0
             }
-            MemoryAccessKind::Store | MemoryAccessKind::Atomic | MemoryAccessKind::ReservationStore => {
-                l2_pte & SV32_PTE_W != 0
-            }
+            MemoryAccessKind::Store
+            | MemoryAccessKind::Atomic
+            | MemoryAccessKind::ReservationStore => l2_pte & SV32_PTE_W != 0,
         };
         if !allowed {
             return None;

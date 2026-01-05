@@ -1,5 +1,5 @@
-use goblin::elf::Elf;
 use goblin::elf::section_header::SHT_NOBITS;
+use goblin::elf::Elf;
 
 pub struct ElfInfo<'a> {
     pub code: &'a [u8],
@@ -16,7 +16,8 @@ pub struct ElfSection<'a> {
 impl<'a> ElfInfo<'a> {
     /// Returns a flat buffer with all `.text*` sections merged, and the base address.
     pub fn get_flat_code(&self) -> Option<(Vec<u8>, u64)> {
-        let text_sections: Vec<&ElfSection> = self.sections
+        let text_sections: Vec<&ElfSection> = self
+            .sections
             .iter()
             .filter(|s| s.name.starts_with(".text"))
             .collect();
@@ -41,7 +42,8 @@ impl<'a> ElfInfo<'a> {
 
     /// Returns a flat buffer with all `.rodata*` sections merged, and the base address.
     pub fn get_flat_rodata(&self) -> Option<(Vec<u8>, u64)> {
-        let rodata_sections: Vec<&ElfSection> = self.sections
+        let rodata_sections: Vec<&ElfSection> = self
+            .sections
             .iter()
             .filter(|s| s.name.starts_with(".rodata"))
             .collect();
@@ -51,7 +53,11 @@ impl<'a> ElfInfo<'a> {
         }
 
         let min_addr = rodata_sections.iter().map(|s| s.addr).min().unwrap();
-        let max_addr = rodata_sections.iter().map(|s| s.addr + s.size).max().unwrap();
+        let max_addr = rodata_sections
+            .iter()
+            .map(|s| s.addr + s.size)
+            .max()
+            .unwrap();
 
         let total_size = (max_addr - min_addr) as usize;
         let mut flat_rodata = vec![0u8; total_size];
@@ -83,17 +89,12 @@ impl<'a> ElfInfo<'a> {
         }
 
         let min_addr = bss_sections.iter().map(|s| s.addr).min().unwrap();
-        let max_addr = bss_sections
-            .iter()
-            .map(|s| s.addr + s.size)
-            .max()
-            .unwrap();
+        let max_addr = bss_sections.iter().map(|s| s.addr + s.size).max().unwrap();
 
         let total_size = (max_addr - min_addr) as usize;
         Some((vec![0u8; total_size], min_addr))
     }
 }
-
 
 pub fn parse_elf_from_bytes<'a>(bytes: &'a [u8]) -> Result<ElfInfo<'a>, goblin::error::Error> {
     let elf = Elf::parse(bytes)?;
@@ -121,5 +122,8 @@ pub fn parse_elf_from_bytes<'a>(bytes: &'a [u8]) -> Result<ElfInfo<'a>, goblin::
         }
     }
 
-    Ok(ElfInfo { code: bytes, sections })
+    Ok(ElfInfo {
+        code: bytes,
+        sections,
+    })
 }

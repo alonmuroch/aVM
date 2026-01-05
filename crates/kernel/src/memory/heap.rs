@@ -45,9 +45,7 @@ pub fn init(heap_ptr: u32, va_base: u32, va_len: u32) {
 ///
 /// Returns a kernel virtual address on success, or None on exhaustion/invalid args.
 pub fn alloc(size: usize, align: usize) -> Option<*mut u8> {
-    unsafe {
-        crate::global::KERNEL_HEAP.get_mut().alloc(size, align)
-    }
+    unsafe { crate::global::KERNEL_HEAP.get_mut().alloc(size, align) }
 }
 
 /// Deallocate a kernel buffer. Bump allocator does not reclaim memory yet.

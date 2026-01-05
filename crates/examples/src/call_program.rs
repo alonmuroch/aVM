@@ -11,7 +11,7 @@ use clibc::{DataParser, entrypoint, require, types::result::Result, vm_panic};
 include!("../bin/simple_abi.rs");
 
 /// Program that uses generated ABI code to call the simple contract
-/// 
+///
 /// This demonstrates using auto-generated client code instead of manual encoding.
 /// The program expects:
 /// - 20 bytes: Address of the simple contract
@@ -31,18 +31,18 @@ fn my_vm_entry(program: Address, caller: Address, data: &[u8]) -> Result {
     // Extract the two numbers to compare
     let first = parser.read_u32();
     let second = parser.read_u32();
-    
+
     // Prepare the data for the simple contract (8 bytes: two u32 values)
     let mut call_data = [0u8; 8];
     call_data[0..4].copy_from_slice(&first.to_le_bytes());
     call_data[4..8].copy_from_slice(&second.to_le_bytes());
-    
+
     // Call the simple contract using the generated client's call_main method
     let ret = match simple_client.call_main(&caller, &call_data) {
         Some(result) => result,
         None => vm_panic(b"program call failed"),
     };
-    
+
     ret
 }
 

@@ -1,8 +1,6 @@
-use kernel::global::{
-    CURRENT_TX, KERNEL_RESULT_ADDR, LAST_COMPLETED_TASK, RECEIPTS, STATE, TASKS,
-};
-use kernel::memory::heap;
 use clibc::{log, logf};
+use kernel::global::{CURRENT_TX, KERNEL_RESULT_ADDR, LAST_COMPLETED_TASK, RECEIPTS, STATE, TASKS};
+use kernel::memory::heap;
 use types::{KernelResult, TransactionReceipt};
 
 pub(crate) fn update_receipt_from_task() {
@@ -20,9 +18,7 @@ pub(crate) fn update_receipt_from_task() {
     };
     let result = unsafe {
         let tasks = TASKS.get_mut();
-        tasks
-            .get(task_idx)
-            .and_then(|task| task.last_result)
+        tasks.get(task_idx).and_then(|task| task.last_result)
     };
     let result = match result {
         Some(res) => res,
@@ -92,9 +88,5 @@ pub(crate) fn write_kernel_result() {
     unsafe {
         core::ptr::write_volatile(KERNEL_RESULT_ADDR as *mut KernelResult, header);
     }
-    logf!(
-        "kernel_result: receipts_ptr=0x%x receipts_len=%d",
-        ptr,
-        len
-    );
+    logf!("kernel_result: receipts_ptr=0x%x receipts_len=%d", ptr, len);
 }

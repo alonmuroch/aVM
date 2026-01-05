@@ -27,7 +27,10 @@ pub(crate) fn sys_fire_event(args: [u32; 6]) -> u32 {
             receipt.add_event(event_bytes);
         }
         None => {
-            logf!("sys_fire_event: missing receipt for tx %d", current_idx as u32);
+            logf!(
+                "sys_fire_event: missing receipt for tx %d",
+                current_idx as u32
+            );
         }
     }
     0

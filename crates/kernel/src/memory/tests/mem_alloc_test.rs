@@ -8,19 +8,15 @@ use clibc::log;
 use kernel::BootInfo;
 use kernel::memory::{heap, page_allocator};
 
-#[path = "../../tests/results.rs"]
-mod results;
 #[path = "../../tests/fail.rs"]
 mod fail;
+#[path = "../../tests/results.rs"]
+mod results;
 #[path = "../../tests/utils.rs"]
 mod utils;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn _start(
-    input_ptr: *const u8,
-    input_len: usize,
-    boot_info_ptr: *const BootInfo,
-) {
+pub extern "C" fn _start(input_ptr: *const u8, input_len: usize, boot_info_ptr: *const BootInfo) {
     log!("kernel mem alloc test boot");
     let info = utils::init_test_kernel(boot_info_ptr);
 

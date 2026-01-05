@@ -1,7 +1,7 @@
+use crate::results;
 use clibc::log;
 use kernel::memory::{heap, page_allocator};
-use kernel::{trap, BootInfo};
-use crate::results;
+use kernel::{BootInfo, trap};
 
 #[path = "../init_boot.rs"]
 mod init_boot;

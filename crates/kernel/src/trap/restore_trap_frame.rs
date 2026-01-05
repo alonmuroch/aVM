@@ -1,4 +1,4 @@
-use super::{return_from_trap, TRAP_FRAME_BYTES};
+use super::{TRAP_FRAME_BYTES, return_from_trap};
 
 #[unsafe(naked)]
 pub(super) unsafe extern "C" fn restore_trap_frame(

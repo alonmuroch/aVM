@@ -69,15 +69,11 @@ pub fn balance(addr: &Address) -> u128 {
 /// Convenience macro to invoke a transfer from a contract.
 #[macro_export]
 macro_rules! transfer {
-    ($to:expr, $value:expr) => {{
-        $crate::transfer::transfer($to, $value)
-    }};
+    ($to:expr, $value:expr) => {{ $crate::transfer::transfer($to, $value) }};
 }
 
 /// Macro wrapper for `balance`.
 #[macro_export]
 macro_rules! balance {
-    ($addr:expr) => {{
-        $crate::transfer::balance($addr)
-    }};
+    ($addr:expr) => {{ $crate::transfer::balance($addr) }};
 }

@@ -36,8 +36,8 @@ pub(super) unsafe extern "C" fn save_trap_frame() -> ! {
         "sw t5, 120(sp)",    // x30
         "sw t6, 124(sp)",    // x31
         "csrr t1, sepc",
-        "sw t1, 128(sp)",    // pc
-        "mv a0, sp", // return saved-area pointer in a0
+        "sw t1, 128(sp)", // pc
+        "mv a0, sp",      // return saved-area pointer in a0
         "ret",
     );
 }

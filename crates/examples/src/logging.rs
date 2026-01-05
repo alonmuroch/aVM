@@ -2,9 +2,9 @@
 #![no_main]
 
 extern crate clibc;
-use core::fmt;
 use clibc::types::address::Address;
 use clibc::{DataParser, concat_str, entrypoint, log, logf, types::result::Result};
+use core::fmt;
 
 /// Comprehensive logging demonstration showing all format specifiers
 unsafe fn logging(program: Address, _caller: Address, data: &[u8]) -> Result {

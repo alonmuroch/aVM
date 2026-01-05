@@ -6,8 +6,8 @@ use core::mem::MaybeUninit;
 use core::ptr;
 use state::State;
 use types::TransactionReceipt;
-use types::{ADDRESS_LEN, SV32_PAGE_SIZE};
 use types::transaction::TransactionBundle;
+use types::{ADDRESS_LEN, SV32_PAGE_SIZE};
 
 use crate::Task;
 use crate::memory::heap::BumpAllocator;

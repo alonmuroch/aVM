@@ -1,10 +1,13 @@
-use clibc::router::{decode_calls, route, FuncCall};
-use types::{Result, Address};
+use clibc::router::{FuncCall, decode_calls, route};
+use types::{Address, Result};
 
 #[test]
 fn test_decode_single_call() {
     let input = [0x01, 0x08, 100, 0, 0, 0, 42, 0, 0, 0];
-    let mut buf = [FuncCall { selector: 0, args: &[] }; 1];
+    let mut buf = [FuncCall {
+        selector: 0,
+        args: &[],
+    }; 1];
 
     let count = decode_calls(&input, &mut buf);
     assert_eq!(count, 1);
@@ -14,11 +17,11 @@ fn test_decode_single_call() {
 
 #[test]
 fn test_decode_multiple_calls() {
-    let input = [
-        0x01, 0x02, 1, 2,
-        0x02, 0x03, 3, 4, 5,
-    ];
-    let mut buf = [FuncCall { selector: 0, args: &[] }; 2];
+    let input = [0x01, 0x02, 1, 2, 0x02, 0x03, 3, 4, 5];
+    let mut buf = [FuncCall {
+        selector: 0,
+        args: &[],
+    }; 2];
 
     let count = decode_calls(&input, &mut buf);
     assert_eq!(count, 2);
@@ -30,26 +33,21 @@ fn test_decode_multiple_calls() {
 
 #[test]
 fn test_route_with_two_calls() {
-    let input = [
-        0x10, 0x01, 42,
-        0x20, 0x02, 1, 2,
-    ];
+    let input = [0x10, 0x01, 42, 0x20, 0x02, 1, 2];
 
     let to = Address([0u8; 20]);
     let from = Address([0u8; 20]);
 
-    let result = route(&input, to, from, |_to, _from, call| {
-                    match call.selector {
-                0x10 => {
-                    assert_eq!(call.args, &[42]);
-                    Result::new(true, 10)
-                },
-                0x20 => {
-                    assert_eq!(call.args, &[1, 2]);
-                    Result::new(false, 20)
-                },
-                _ => Result::new(false, 999),
-            }
+    let result = route(&input, to, from, |_to, _from, call| match call.selector {
+        0x10 => {
+            assert_eq!(call.args, &[42]);
+            Result::new(true, 10)
+        }
+        0x20 => {
+            assert_eq!(call.args, &[1, 2]);
+            Result::new(false, 20)
+        }
+        _ => Result::new(false, 999),
     });
 
     assert_eq!(result, Result::new(false, 20));
@@ -59,7 +57,10 @@ fn test_route_with_two_calls() {
 #[should_panic(expected = "vm_panic: decode: incomplete header")]
 fn test_decode_incomplete_header_panics() {
     let input = [0x01];
-    let mut buf = [FuncCall { selector: 0, args: &[] }; 1];
+    let mut buf = [FuncCall {
+        selector: 0,
+        args: &[],
+    }; 1];
     decode_calls(&input, &mut buf);
 }
 
@@ -67,6 +68,9 @@ fn test_decode_incomplete_header_panics() {
 #[should_panic(expected = "vm_panic: decode: args too short")]
 fn test_decode_args_too_short_panics() {
     let input = [0x01, 0x04, 1, 2]; // 4 bytes expected, only 2 given
-    let mut buf = [FuncCall { selector: 0, args: &[] }; 1];
+    let mut buf = [FuncCall {
+        selector: 0,
+        args: &[],
+    }; 1];
     decode_calls(&input, &mut buf);
 }

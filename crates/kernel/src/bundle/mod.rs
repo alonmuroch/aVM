@@ -11,13 +11,13 @@ use kernel::global::{BUNDLE, CURRENT_TX, RECEIPTS};
 
 mod create_account;
 mod program_call;
-mod transfer;
 mod result;
+mod transfer;
 
 use self::create_account::create_account;
 use self::program_call::program_call;
-use self::transfer::transfer;
 use self::result::{update_receipt_from_task, write_kernel_result};
+use self::transfer::transfer;
 
 pub(crate) fn decode_bundle(encoded_bundle: &[u8]) -> bool {
     log!("processing transaction bundle");

@@ -34,7 +34,9 @@ pub struct ArchRegistry {
 
 impl ArchRegistry {
     pub fn new() -> Self {
-        Self { runners: Vec::new() }
+        Self {
+            runners: Vec::new(),
+        }
     }
 
     pub fn register(&mut self, runner: Box<dyn ArchRunner>) {

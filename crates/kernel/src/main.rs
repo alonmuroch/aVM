@@ -3,13 +3,13 @@
 
 extern crate alloc;
 
+use clibc::log;
 use core::slice;
 use kernel::BootInfo;
-use clibc::log;
 
+mod bundle;
 mod init;
 mod init_boot;
-mod bundle;
 use crate::bundle::{decode_bundle, process_bundle};
 use crate::init::init_kernel;
 

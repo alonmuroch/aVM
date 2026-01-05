@@ -1,7 +1,9 @@
-use super::{Instruction, MemoryAccessKind, Memory, CPU, CSR_MEPC, CSR_SATP, CSR_SEPC, SCAUSE_BREAKPOINT};
+use super::{
+    Instruction, Memory, MemoryAccessKind, CPU, CSR_MEPC, CSR_SATP, CSR_SEPC, SCAUSE_BREAKPOINT,
+};
 use crate::console::{console_write, CONSOLE_WRITE_ID};
-use crate::memory::VirtualAddress;
 use crate::instruction::CsrOp;
+use crate::memory::VirtualAddress;
 use crate::registers::Register;
 
 impl CPU {
@@ -24,11 +26,7 @@ impl CPU {
     /// - imm: Immediate value (constant)
     ///
     /// RETURN VALUE: Returns true to continue execution, false to halt
-    pub fn execute(
-        &mut self,
-        instr: Instruction,
-        memory: Memory,
-    ) -> bool {
+    pub fn execute(&mut self, instr: Instruction, memory: Memory) -> bool {
         match instr {
             // EDUCATIONAL: Arithmetic instructions - perform mathematical operations
             Instruction::Add { rd, rs1, rs2 } => {

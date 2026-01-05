@@ -56,21 +56,24 @@ fn main(program: Address, _caller: Address, data: &[u8]) -> Result {
     for i in 0..20 {
         large_vec.push(i);
     }
-    require(large_vec.len() == 20, b"Large vector should have 20 elements");
-    
+    require(
+        large_vec.len() == 20,
+        b"Large vector should have 20 elements",
+    );
+
     // Test BTreeMap operations
     let mut scores = BTreeMap::new();
     scores.insert("alice", alice_score);
     scores.insert("bob", bob_score);
     scores.insert("charlie", charlie_score);
-    
+
     match scores.get("alice") {
         Some(&v) => require(v == alice_score, b"Alice's score mismatch"),
         None => vm_panic(b"Alice not found in BTreeMap"),
     }
-    
+
     match scores.get("bob") {
-        Some(&v) => require(v == bob_score, b"Bob's score mismatch"), 
+        Some(&v) => require(v == bob_score, b"Bob's score mismatch"),
         None => vm_panic(b"Bob not found in BTreeMap"),
     }
 
@@ -78,7 +81,7 @@ fn main(program: Address, _caller: Address, data: &[u8]) -> Result {
         Some(&v) => require(v == charlie_score, b"Charlie's score mismatch"),
         None => vm_panic(b"Charlie not found in BTreeMap"),
     }
-    
+
     require(scores.len() == 3, b"BTreeMap should have 3 elements");
 
     Result::new(true, 0)

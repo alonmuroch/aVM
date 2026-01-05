@@ -3,7 +3,7 @@
 
 use std::io::Read;
 use std::path::Path;
-use vm::memory::{API, MMU, Perms, Sv32Memory, VirtualAddress, PAGE_SIZE};
+use vm::memory::{Perms, Sv32Memory, VirtualAddress, API, MMU, PAGE_SIZE};
 use vm::registers::Register;
 use vm::vm::VM;
 
@@ -13,10 +13,22 @@ const MAX_STEPS: usize = 20_000_000;
 
 /// Tests that are skipped and the reasons why
 const SKIPPED_TESTS: &[(&str, &str)] = &[
-    ("fence_i", "Requires self-modifying code support (writes instructions to memory and executes them)"),
-    ("ld_st", "Contains 64-bit load/store instructions (ld/sd) that the 32-bit VM doesn't support"),
-    ("st_ld", "Contains 64-bit store/load instructions (sd/ld) that the 32-bit VM doesn't support"),
-    ("lrsc", "LR/SC implementation needs improvement - causes infinite loops"),
+    (
+        "fence_i",
+        "Requires self-modifying code support (writes instructions to memory and executes them)",
+    ),
+    (
+        "ld_st",
+        "Contains 64-bit load/store instructions (ld/sd) that the 32-bit VM doesn't support",
+    ),
+    (
+        "st_ld",
+        "Contains 64-bit store/load instructions (sd/ld) that the 32-bit VM doesn't support",
+    ),
+    (
+        "lrsc",
+        "LR/SC implementation needs improvement - causes infinite loops",
+    ),
 ];
 
 /// Testing categories to run
@@ -49,7 +61,7 @@ fn run_single_test(elf_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let (code, code_start) = elf.get_flat_code().ok_or("No code section in ELF")?;
     let (rodata, rodata_start) = elf.get_flat_rodata().unwrap_or((vec![], u64::MAX));
     let (bss, bss_start) = elf.get_flat_bss().unwrap_or((vec![], u64::MAX));
-    
+
     // Get .data section if it exists
     let (data, data_start) = if let Some(data_section) = elf.get_section_by_name(".data") {
         (data_section.data.to_vec(), data_section.addr as usize)
@@ -97,9 +109,22 @@ fn run_single_test(elf_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let total_size = map_len.max(DEFAULT_VM_SIZE);
     let memory = std::rc::Rc::new(Sv32Memory::new(total_size, PAGE_SIZE));
 
-    println!("Loading code into VM: addr=0x{:x}, size=0x{:x}", code_start, code.len());
-    println!("Mapping {:x}-{:x} (size=0x{:x})", min_base, min_base + map_len, map_len);
-    memory.map_range(VirtualAddress(min_base as u32), map_len, Perms::rwx_kernel());
+    println!(
+        "Loading code into VM: addr=0x{:x}, size=0x{:x}",
+        code_start,
+        code.len()
+    );
+    println!(
+        "Mapping {:x}-{:x} (size=0x{:x})",
+        min_base,
+        min_base + map_len,
+        map_len
+    );
+    memory.map_range(
+        VirtualAddress(min_base as u32),
+        map_len,
+        Perms::rwx_kernel(),
+    );
 
     let mut image = vec![0u8; image_size];
     let code_off = (code_start as usize).saturating_sub(min_base);
@@ -156,7 +181,7 @@ fn run_single_test(elf_path: &str) -> Result<(), Box<dyn std::error::Error>> {
             return Err(format!("test failed (tohost=0x{:x})", tohost_value).into());
         }
     }
-    
+
     let exit_id = vm.cpu.regs[Register::A7 as usize];
     if exit_id == 93 {
         let exit_code = vm.cpu.regs[Register::A0 as usize];
@@ -170,15 +195,14 @@ fn run_single_test(elf_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     Err("execution halted without tohost signal".into())
 }
 
-fn read_tohost_value(memory: &Sv32Memory, tohost_addr: u64) -> Result<u64, Box<dyn std::error::Error>> {
+fn read_tohost_value(
+    memory: &Sv32Memory,
+    tohost_addr: u64,
+) -> Result<u64, Box<dyn std::error::Error>> {
     let addr = u32::try_from(tohost_addr).map_err(|_| "tohost address out of range")?;
     let start = VirtualAddress(addr);
-    let end = start
-        .checked_add(8)
-        .ok_or("tohost address overflow")?;
-    let slice = memory
-        .mem_slice(start, end)
-        .ok_or("tohost not mapped")?;
+    let end = start.checked_add(8).ok_or("tohost address overflow")?;
+    let slice = memory.mem_slice(start, end).ok_or("tohost not mapped")?;
     if slice.len() < 8 {
         return Err("tohost slice truncated".into());
     }
@@ -190,10 +214,10 @@ fn read_tohost_value(memory: &Sv32Memory, tohost_addr: u64) -> Result<u64, Box<d
 fn collect_test_files(test_dir: &str, category: &str) -> (Vec<String>, usize) {
     let mut test_files = Vec::new();
     let mut skipped_count = 0;
-    
+
     println!("Looking for files in: {}", test_dir);
     println!("Category prefix: rv32{}p-", category);
-    
+
     if let Ok(entries) = std::fs::read_dir(test_dir) {
         for entry in entries {
             if let Ok(entry) = entry {
@@ -202,17 +226,17 @@ fn collect_test_files(test_dir: &str, category: &str) -> (Vec<String>, usize) {
                     if let Some(name_str) = file_name.to_str() {
                         // Include files that start with the category prefix and are not .dump files
                         let category_prefix = format!("rv32{}-p-", category);
-                        if name_str.starts_with(&category_prefix) && 
-                           !path.is_dir() && 
-                           !name_str.ends_with(".dump") {
-                                                        
+                        if name_str.starts_with(&category_prefix)
+                            && !path.is_dir()
+                            && !name_str.ends_with(".dump")
+                        {
                             // Check if this test should be skipped
                             if let Some(reason) = should_skip_test(name_str) {
                                 println!("Skipping {}: {}", name_str, reason);
                                 skipped_count += 1;
                                 continue;
                             }
-                            
+
                             test_files.push(path.to_string_lossy().to_string());
                         }
                     }
@@ -222,17 +246,28 @@ fn collect_test_files(test_dir: &str, category: &str) -> (Vec<String>, usize) {
     } else {
         println!("Failed to read directory: {}", test_dir);
     }
-    
+
     test_files.sort(); // Sort for consistent ordering
     (test_files, skipped_count)
 }
 
 /// Run all tests for a specific category
-fn run_category_tests(test_dir: &str, category: &str) -> Result<(usize, usize, usize), Box<dyn std::error::Error>> {
-    println!("\n=== Running {} category tests ===", category.to_uppercase());
-    
+fn run_category_tests(
+    test_dir: &str,
+    category: &str,
+) -> Result<(usize, usize, usize), Box<dyn std::error::Error>> {
+    println!(
+        "\n=== Running {} category tests ===",
+        category.to_uppercase()
+    );
+
     let (test_files, skipped_count) = collect_test_files(test_dir, category);
-    println!("Found {} {} test files to run ({} skipped)", test_files.len(), category, skipped_count);
+    println!(
+        "Found {} {} test files to run ({} skipped)",
+        test_files.len(),
+        category,
+        skipped_count
+    );
 
     let mut passed_count = 0;
     let failed_count = 0;
@@ -243,9 +278,9 @@ fn run_category_tests(test_dir: &str, category: &str) -> Result<(usize, usize, u
             .unwrap()
             .to_str()
             .unwrap();
-        
+
         print!("[{:2}/{:2}] {}: ", i + 1, test_files.len(), test_name);
-        
+
         if let Err(e) = run_single_test(elf_path) {
             println!("❌ FAILED - {}", e);
             return Err(e);
@@ -254,8 +289,11 @@ fn run_category_tests(test_dir: &str, category: &str) -> Result<(usize, usize, u
             passed_count += 1;
         }
     }
-    
-    println!("=== {} category tests completed ===", category.to_uppercase());
+
+    println!(
+        "=== {} category tests completed ===",
+        category.to_uppercase()
+    );
     Ok((passed_count, failed_count, skipped_count))
 }
 
@@ -263,7 +301,7 @@ fn run_category_tests(test_dir: &str, category: &str) -> Result<(usize, usize, u
 fn test_riscv_spec() {
     // Discover all test files in the riscv-tests directory
     let test_dir = "tests/riscv-tests-install/share/riscv-tests/isa";
-    
+
     // Print current working directory for debugging
     println!("Current dir: {:?}", std::env::current_dir().unwrap());
     println!("Looking for tests in: {}", test_dir);
@@ -297,39 +335,53 @@ fn test_riscv_spec() {
             }
         }
     }
-    
+
     // Print comprehensive summary
     println!("\n{}", "=".repeat(60));
     println!("📊 RISC-V SPECIFICATION TEST SUITE SUMMARY");
     println!("{}", "=".repeat(60));
-    
+
     // Category breakdown
     println!("\n📋 Category Breakdown:");
     for (category, passed, failed, skipped) in &category_results {
         let total = passed + failed + skipped;
-        let success_rate = if total > 0 { (*passed as f64 / total as f64) * 100.0 } else { 0.0 };
-        println!("  {}: {}/{} passed ({:.1}%) {} skipped", 
-                category.to_uppercase(), passed, total, success_rate, skipped);
+        let success_rate = if total > 0 {
+            (*passed as f64 / total as f64) * 100.0
+        } else {
+            0.0
+        };
+        println!(
+            "  {}: {}/{} passed ({:.1}%) {} skipped",
+            category.to_uppercase(),
+            passed,
+            total,
+            success_rate,
+            skipped
+        );
     }
-    
+
     // Overall statistics
     let total_tests = total_passed + total_failed + total_skipped;
-    let overall_success_rate = if total_tests > 0 { (total_passed as f64 / total_tests as f64) * 100.0 } else { 0.0 };
-    
+    let overall_success_rate = if total_tests > 0 {
+        (total_passed as f64 / total_tests as f64) * 100.0
+    } else {
+        0.0
+    };
+
     println!("\n📈 Overall Statistics:");
     println!("  Total Tests: {}", total_tests);
     println!("  Passed: {} ✅", total_passed);
     println!("  Failed: {} ❌", total_failed);
     println!("  Skipped: {} ⏭️", total_skipped);
     println!("  Success Rate: {:.1}%", overall_success_rate);
-    
+
     // Test coverage information
     println!("\n🎯 Test Coverage:");
     println!("  UI Tests: Base integer instructions (RV32I)");
     println!("  UM Tests: Integer multiplication and division (RV32M)");
     println!("  UA Tests: Atomic memory operations (RV32A)");
     println!("  UC Tests: Compressed instructions (RV32C)");
-    
+
     // Skipped tests explanation
     if total_skipped > 0 {
         println!("\n⏭️ Skipped Tests:");
@@ -337,9 +389,9 @@ fn test_riscv_spec() {
             println!("  - {}: {}", test_name, reason);
         }
     }
-    
+
     println!("\n{}", "=".repeat(60));
-    
+
     if total_failed > 0 {
         panic!("Test suite completed with {} failures", total_failed);
     } else {

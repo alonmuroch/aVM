@@ -2,11 +2,11 @@
 #![no_main]
 
 extern crate clibc;
-use k256::ecdsa::{Signature, VerifyingKey, signature::hazmat::PrehashVerifier};
 use clibc::{
     DataParser, HexCodec, entrypoint, log, logf, require, types::address::Address,
     types::result::Result, vm_panic,
 };
+use k256::ecdsa::{Signature, VerifyingKey, signature::hazmat::PrehashVerifier};
 
 /// ECDSA verification example using k256.
 /// Input layout:

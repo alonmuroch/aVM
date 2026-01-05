@@ -1,15 +1,17 @@
-use core::{mem, slice};
 use core::fmt::Write as FmtWrite;
+use core::{mem, slice};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::vec::Vec;
 
 use compiler::elf::parse_elf_from_bytes;
 use goblin::elf::Elf;
-use types::{boot::BootInfo, transaction::TransactionBundle, SV32_DIRECT_MAP_BASE};
+use types::{SV32_DIRECT_MAP_BASE, boot::BootInfo, transaction::TransactionBundle};
 
 use state::State;
-use vm::memory::{API, Perms, Sv32Memory, HEAP_PTR_OFFSET, Memory as MmuRef, VirtualAddress, PAGE_SIZE};
+use vm::memory::{
+    API, HEAP_PTR_OFFSET, Memory as MmuRef, PAGE_SIZE, Perms, Sv32Memory, VirtualAddress,
+};
 use vm::registers::Register;
 use vm::vm::VM;
 
@@ -162,17 +164,13 @@ impl Bootloader {
         // Register a length hint so the kernel can bounds-check the payload.
         vm.set_reg_u32(Register::A1, encoded.len() as u32);
         // Keep heap aligned after our write.
-        self.set_next_heap(
-            (addr as usize + encoded.len() + HEAP_PTR_OFFSET as usize) as u32,
-        );
+        self.set_next_heap((addr as usize + encoded.len() + HEAP_PTR_OFFSET as usize) as u32);
     }
 
     fn place_state(&mut self, vm: &mut VM, state: &[u8]) {
         let addr = self.place_data(vm, Register::A2, state);
         vm.set_reg_u32(Register::A3, state.len() as u32);
-        self.set_next_heap(
-            (addr as usize + state.len() + HEAP_PTR_OFFSET as usize) as u32,
-        );
+        self.set_next_heap((addr as usize + state.len() + HEAP_PTR_OFFSET as usize) as u32);
     }
 
     fn place_boot_info(&mut self, vm: &mut VM) {
@@ -236,5 +234,4 @@ impl Bootloader {
         self.heap_ptr.set(end);
         start
     }
-
 }

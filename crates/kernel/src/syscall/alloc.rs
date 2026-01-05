@@ -1,7 +1,7 @@
 use clibc::{log, logf};
 
-use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, TASKS};
 use crate::Task;
+use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, TASKS};
 
 pub(crate) fn alloc_in_task(task: &mut Task, size: u32, align: u32) -> Option<u32> {
     if size == 0 {

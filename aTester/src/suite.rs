@@ -50,7 +50,12 @@ impl<'a> Suite<'a> {
                     let outcome = self.evaluator.evaluate(case, &result);
                     (outcome, result.exit_code, result.stdout, result.stderr)
                 }
-                Err(err) => (TestOutcome::Failed(err.message.clone()), -1, String::new(), err.message),
+                Err(err) => (
+                    TestOutcome::Failed(err.message.clone()),
+                    -1,
+                    String::new(),
+                    err.message,
+                ),
             };
             reports.push(TestReport {
                 name: case.name.clone(),

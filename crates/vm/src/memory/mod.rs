@@ -102,14 +102,53 @@ impl From<VirtualAddress> for usize {
 pub trait MMU: std::fmt::Debug {
     // --- CPU-facing data access (loads/stores/fetches) ---
     fn mem(&self) -> Ref<Vec<u8>>;
-    fn mem_slice(&self, start: VirtualAddress, end: VirtualAddress) -> Option<std::cell::Ref<[u8]>>;
-    fn store_u16(&self, addr: VirtualAddress, val: u16, metering: &mut dyn Metering, kind: MemoryAccessKind) -> bool;
-    fn store_u32(&self, addr: VirtualAddress, val: u32, metering: &mut dyn Metering, kind: MemoryAccessKind) -> bool;
-    fn store_u8(&self, addr: VirtualAddress, val: u8, metering: &mut dyn Metering, kind: MemoryAccessKind) -> bool;
-    fn load_u32(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u32>;
-    fn load_byte(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u8>;
-    fn load_halfword(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u16>;
-    fn load_word(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u32>;
+    fn mem_slice(&self, start: VirtualAddress, end: VirtualAddress)
+        -> Option<std::cell::Ref<[u8]>>;
+    fn store_u16(
+        &self,
+        addr: VirtualAddress,
+        val: u16,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> bool;
+    fn store_u32(
+        &self,
+        addr: VirtualAddress,
+        val: u32,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> bool;
+    fn store_u8(
+        &self,
+        addr: VirtualAddress,
+        val: u8,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> bool;
+    fn load_u32(
+        &self,
+        addr: VirtualAddress,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> Option<u32>;
+    fn load_byte(
+        &self,
+        addr: VirtualAddress,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> Option<u8>;
+    fn load_halfword(
+        &self,
+        addr: VirtualAddress,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> Option<u16>;
+    fn load_word(
+        &self,
+        addr: VirtualAddress,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> Option<u32>;
 }
 
 pub trait API: std::fmt::Debug {

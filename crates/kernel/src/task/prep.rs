@@ -1,16 +1,16 @@
-use crate::{AddressSpace, Task};
 use crate::global::{
     CALL_ARGS_PAGE_BASE, CURRENT_TASK, FROM_PTR_ADDR, HEAP_START_ADDR, INPUT_BASE_ADDR,
     MAX_INPUT_LEN, TO_PTR_ADDR,
 };
 use crate::memory::page_allocator as mmu;
+use crate::{AddressSpace, Task};
 use clibc::{log, logf};
-use types::address::Address;
 use types::SV32_PAGE_SIZE;
+use types::address::Address;
 
 use super::{
-    alloc_asid, trampoline::map_trampoline_page, PROGRAM_VA_BASE, PROGRAM_WINDOW_BYTES, REG_A0,
-    REG_A1, REG_A2, REG_A3, REG_SP, STACK_BYTES,
+    PROGRAM_VA_BASE, PROGRAM_WINDOW_BYTES, REG_A0, REG_A1, REG_A2, REG_A3, REG_SP, STACK_BYTES,
+    alloc_asid, trampoline::map_trampoline_page,
 };
 
 /// Create a new task for a program and map its virtual address window via syscalls.
@@ -65,16 +65,25 @@ pub fn prep_program_task(
         panic!("launch_program: invalid entry offset");
     }
     if !mmu::copy(root_ppn, PROGRAM_VA_BASE, code) {
-        logf!("launch_program: failed to copy code into root=0x%x", root_ppn);
+        logf!(
+            "launch_program: failed to copy code into root=0x%x",
+            root_ppn
+        );
         return None;
     }
 
     if !mmu::copy(root_ppn, TO_PTR_ADDR, &to.0) {
-        logf!("launch_program: failed to copy 'to' address into root=0x%x", root_ppn);
+        logf!(
+            "launch_program: failed to copy 'to' address into root=0x%x",
+            root_ppn
+        );
         return None;
     }
     if !mmu::copy(root_ppn, FROM_PTR_ADDR, &from.0) {
-        logf!("launch_program: failed to copy 'from' address into root=0x%x", root_ppn);
+        logf!(
+            "launch_program: failed to copy 'from' address into root=0x%x",
+            root_ppn
+        );
         return None;
     }
     if !mmu::copy(root_ppn, INPUT_BASE_ADDR, input) {
@@ -98,12 +107,7 @@ pub fn prep_program_task(
     map_trampoline_page(root_ppn);
 
     let mut task = Task::new(
-        AddressSpace::new(
-            root_ppn,
-            asid,
-            PROGRAM_VA_BASE,
-            PROGRAM_WINDOW_BYTES as u32,
-        ),
+        AddressSpace::new(root_ppn, asid, PROGRAM_VA_BASE, PROGRAM_WINDOW_BYTES as u32),
         HEAP_START_ADDR as u32,
     );
     let caller = unsafe { *CURRENT_TASK.get_mut() };
@@ -155,7 +159,10 @@ fn map_program_window(root_ppn: u32, code_len: usize) {
     let first_page_perms = mmu::PagePerms::user_rwx();
     // Page 0 hosts the result header at 0x100, so keep it writable.
     if !mmu::map_range_for_root(root_ppn, PROGRAM_VA_BASE, first_page_len, first_page_perms) {
-        panic!("launch_program: first page mapping failed (root=0x{:x})", root_ppn);
+        panic!(
+            "launch_program: first page mapping failed (root=0x{:x})",
+            root_ppn
+        );
     }
     if code_len > SV32_PAGE_SIZE {
         let code_perms = mmu::PagePerms::new(true, false, true, true);
@@ -163,7 +170,10 @@ fn map_program_window(root_ppn: u32, code_len: usize) {
         let code_rest = code_len.saturating_sub(SV32_PAGE_SIZE);
         // Remaining code pages are RX-only to protect program text.
         if !mmu::map_range_for_root(root_ppn, code_start, code_rest, code_perms) {
-            panic!("launch_program: code mapping failed (root=0x{:x})", root_ppn);
+            panic!(
+                "launch_program: code mapping failed (root=0x{:x})",
+                root_ppn
+            );
         }
     }
     let data_start = PROGRAM_VA_BASE.wrapping_add(code_len as u32);
@@ -171,6 +181,9 @@ fn map_program_window(root_ppn: u32, code_len: usize) {
     let data_perms = mmu::PagePerms::new(true, true, false, true);
     // Data/stack/heap region is RW, non-exec.
     if !mmu::map_range_for_root(root_ppn, data_start, data_len, data_perms) {
-        panic!("launch_program: data mapping failed (root=0x{:x})", root_ppn);
+        panic!(
+            "launch_program: data mapping failed (root=0x{:x})",
+            root_ppn
+        );
     }
 }

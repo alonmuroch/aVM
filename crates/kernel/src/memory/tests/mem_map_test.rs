@@ -8,19 +8,15 @@ use clibc::log;
 use kernel::BootInfo;
 use kernel::memory::page_allocator::{self, PagePerms};
 
-#[path = "../../tests/results.rs"]
-mod results;
 #[path = "../../tests/fail.rs"]
 mod fail;
+#[path = "../../tests/results.rs"]
+mod results;
 #[path = "../../tests/utils.rs"]
 mod utils;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn _start(
-    input_ptr: *const u8,
-    input_len: usize,
-    boot_info_ptr: *const BootInfo,
-) {
+pub extern "C" fn _start(input_ptr: *const u8, input_len: usize, boot_info_ptr: *const BootInfo) {
     log!("kernel mem map test boot");
     let info = utils::init_test_kernel(boot_info_ptr);
 
@@ -115,12 +111,7 @@ fn test_read_only_mapping(
     Ok(())
 }
 
-fn test_exec_mapping(
-    user_root: u32,
-    info: BootInfo,
-    base_va: u32,
-    len: usize,
-) -> Result<(), u32> {
+fn test_exec_mapping(user_root: u32, info: BootInfo, base_va: u32, len: usize) -> Result<(), u32> {
     // Map a user exec-only range and ensure writes are rejected.
     let window_end = info.va_base.saturating_add(info.va_len);
     let mut exec_va = base_va.saturating_add(len as u32).saturating_add(0x2000);

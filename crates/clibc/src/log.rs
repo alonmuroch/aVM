@@ -39,36 +39,36 @@ macro_rules! logf {
     // Special case for Debug trait formatting with %D
     ($fmt:expr, debug: $obj:expr) => {{
         use core::fmt::Write;
-        
+
         // Buffer for Debug formatting
         let mut buffer = [0u8; 256];
         let len = {
             let mut writer = $crate::BufferWriter::new(&mut buffer);
-            
+
             // Format the object using Debug trait
             let _ = core::write!(&mut writer, "{:?}", $obj);
             writer.len()
         };
-        
+
         // Log the formatted string
         let formatted = &buffer[..len];
         $crate::log!($fmt, formatted);
     }};
-    
+
     // Special case for Display trait formatting with %S
     ($fmt:expr, display: $obj:expr) => {{
         use core::fmt::Write;
-        
+
         // Buffer for Display formatting
         let mut buffer = [0u8; 256];
         let len = {
             let mut writer = $crate::BufferWriter::new(&mut buffer);
-            
+
             // Format the object using Display trait
             let _ = core::write!(&mut writer, "{}", $obj);
             writer.len()
         };
-        
+
         // Log the formatted string
         let formatted = &buffer[..len];
         $crate::log!($fmt, formatted);
@@ -80,15 +80,15 @@ macro_rules! logf {
         const MAX_ARGS: usize = 32;
         let mut args_buf = [0u32; MAX_ARGS];
         let mut i = 0;
-        
+
         $(
             args_buf[i] = $arg as u32;
             i += 1;
-            if i >= MAX_ARGS { 
-                i = MAX_ARGS - 1; 
+            if i >= MAX_ARGS {
+                i = MAX_ARGS - 1;
             }
         )+
-        
+
         let fmt_bytes: &[u8] = $crate::as_bytes!($fmt);
         let prefix_bytes = $crate::LOG_PREFIX.as_bytes();
         let mut fmt_buf = [0u8; 256];
@@ -134,13 +134,13 @@ macro_rules! log {
     ($fmt:expr) => {
         $crate::logf!($fmt)
     };
-    
+
     // For strings/arrays - automatically pass ptr and len
     ($fmt:expr, $arg:expr) => {{
         let arg = &$arg;
         $crate::logf!($fmt, arg.as_ptr() as u32, arg.len() as u32);
     }};
-    
+
     // For multiple arguments (scalars)
     ($fmt:expr, $($arg:expr),+) => {
         $crate::logf!($fmt, $($arg),+)
@@ -155,25 +155,25 @@ macro_rules! as_bytes {
         trait AsBytes {
             fn as_bytes_ref(&self) -> &[u8];
         }
-        
+
         impl AsBytes for &str {
             fn as_bytes_ref(&self) -> &[u8] {
                 self.as_bytes()
             }
         }
-        
+
         impl AsBytes for &[u8] {
             fn as_bytes_ref(&self) -> &[u8] {
                 self
             }
         }
-        
+
         impl<const N: usize> AsBytes for &[u8; N] {
             fn as_bytes_ref(&self) -> &[u8] {
                 *self
             }
         }
-        
+
         let s = &$s;
         s.as_bytes_ref()
     }};
@@ -187,9 +187,12 @@ pub struct BufferWriter<'a> {
 
 impl<'a> BufferWriter<'a> {
     pub fn new(buffer: &'a mut [u8]) -> Self {
-        BufferWriter { buffer, position: 0 }
+        BufferWriter {
+            buffer,
+            position: 0,
+        }
     }
-    
+
     pub fn len(&self) -> usize {
         self.position
     }
@@ -200,11 +203,10 @@ impl<'a> core::fmt::Write for BufferWriter<'a> {
         let bytes = s.as_bytes();
         let remaining = self.buffer.len() - self.position;
         let to_write = bytes.len().min(remaining);
-        
-        self.buffer[self.position..self.position + to_write]
-            .copy_from_slice(&bytes[..to_write]);
+
+        self.buffer[self.position..self.position + to_write].copy_from_slice(&bytes[..to_write]);
         self.position += to_write;
-        
+
         if to_write < bytes.len() {
             Err(core::fmt::Error)
         } else {

@@ -50,14 +50,14 @@
 
 use crate::global::NEXT_ASID;
 
-pub mod task;
 pub mod prep;
 pub mod run;
+pub mod task;
 mod trampoline;
 
-pub use task::{AddressSpace, Task, TrapFrame};
 pub use prep::prep_program_task;
 pub use run::{kernel_run_task, run_task};
+pub use task::{AddressSpace, Task, TrapFrame};
 
 const PAGE_SIZE: usize = 4096;
 const STACK_BYTES: usize = crate::global::STACK_BYTES;
@@ -66,11 +66,9 @@ pub const HEAP_BYTES: usize = crate::global::HEAP_BYTES;
 // the user window so it does not collide with program text/stack/heap. This VA
 // is mapped into both roots so satp can be switched without invalidating the
 // instruction stream mid-flight.
-pub const TRAMPOLINE_VA: u32 =
-    (PROGRAM_VA_BASE as usize + PROGRAM_WINDOW_BYTES + 0x10000) as u32; // Shared page outside the kernel window.
+pub const TRAMPOLINE_VA: u32 = (PROGRAM_VA_BASE as usize + PROGRAM_WINDOW_BYTES + 0x10000) as u32; // Shared page outside the kernel window.
 const TRAP_TRAMPOLINE_OFFSET: usize = 0x10; // Offset for the trap-entry stub within the page.
-pub const TRAP_TRAMPOLINE_VA: u32 =
-    TRAMPOLINE_VA + TRAP_TRAMPOLINE_OFFSET as u32; // stvec target for user-mode traps.
+pub const TRAP_TRAMPOLINE_VA: u32 = TRAMPOLINE_VA + TRAP_TRAMPOLINE_OFFSET as u32; // stvec target for user-mode traps.
 pub use crate::global::{PROGRAM_VA_BASE, PROGRAM_WINDOW_BYTES};
 
 const REG_SP: usize = 2;

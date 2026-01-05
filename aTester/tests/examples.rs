@@ -27,10 +27,7 @@ impl TestEvaluator for ExampleEvaluator {
         let expected = match expected_for(case.name.as_str()) {
             Some(expected) => expected,
             None => {
-                return TestOutcome::Failed(format!(
-                    "missing expected result for {}",
-                    case.name
-                ))
+                return TestOutcome::Failed(format!("missing expected result for {}", case.name));
             }
         };
         let success = receipt.result.success;

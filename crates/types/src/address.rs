@@ -1,6 +1,6 @@
-use core::fmt;
 use crate::O;
 use crate::SerializeField;
+use core::fmt;
 
 pub const ADDRESS_LEN: usize = 20;
 
@@ -17,7 +17,7 @@ impl Address {
         if data.len() != 20 {
             return O::None;
         }
-        
+
         let mut bytes = [0u8; 20];
         bytes.copy_from_slice(data);
         O::Some(Address(bytes))

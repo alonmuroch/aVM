@@ -1,4 +1,4 @@
-use crate::instruction::{Instruction, MiscAluOp, CsrOp};
+use crate::instruction::{CsrOp, Instruction, MiscAluOp};
 use crate::isa::Opcode;
 use crate::isa_compressed::CompressedOpcode;
 
@@ -49,7 +49,7 @@ pub fn decode(bytes: &[u8]) -> Option<(Instruction, u8)> {
 
     // EDUCATIONAL: Read the first 16 bits to check if it's compressed
     let hword = u16::from_le_bytes([bytes[0], bytes[1]]);
-    
+
     // EDUCATIONAL: Check bottom 2 bits to determine instruction format
     // 0b11 = regular 32-bit instruction, anything else = compressed
     let is_compressed = (hword & 0b11) != 0b11;
@@ -117,7 +117,7 @@ pub fn decode(bytes: &[u8]) -> Option<(Instruction, u8)> {
 ///
 /// RETURNS: Some(instruction) if valid, None if unrecognized
 pub fn decode_full(word: u32) -> Option<Instruction> {
-        // Null bytes (padding) - treat as no-op
+    // Null bytes (padding) - treat as no-op
     if word == 0x00000000 {
         return Some(Instruction::Unimp);
     }
@@ -152,7 +152,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             // EDUCATIONAL: Basic arithmetic operations
             (0x0, 0x00) => Some(Instruction::Add { rd, rs1, rs2 }),
             (0x0, 0x20) => Some(Instruction::Sub { rd, rs1, rs2 }),
-            
+
             // EDUCATIONAL: Logical operations
             (0x1, 0x00) => Some(Instruction::Sll { rd, rs1, rs2 }),
             (0x4, 0x00) => Some(Instruction::Xor { rd, rs1, rs2 }),
@@ -160,11 +160,11 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             (0x5, 0x20) => Some(Instruction::Sra { rd, rs1, rs2 }),
             (0x6, 0x00) => Some(Instruction::Or { rd, rs1, rs2 }),
             (0x7, 0x00) => Some(Instruction::And { rd, rs1, rs2 }),
-            
+
             // EDUCATIONAL: Comparison operations
             (0x2, 0x00) => Some(Instruction::Slt { rd, rs1, rs2 }),
             (0x3, 0x00) => Some(Instruction::Sltu { rd, rs1, rs2 }),
-            
+
             // EDUCATIONAL: Extended arithmetic (M extension)
             (0x0, 0x01) => Some(Instruction::Mul { rd, rs1, rs2 }),
             (0x1, 0x01) => Some(Instruction::Mulh { rd, rs1, rs2 }),
@@ -176,12 +176,10 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             (0x7, 0x01) => Some(Instruction::Remu { rd, rs1, rs2 }),
             _ => None,
         },
-        
+
         // EDUCATIONAL: Atomic Memory Operations (A extension)
         // These instructions use rs1, rs2, and rd registers
         Opcode::Amo => {
-            
-            
             if funct3 == 0x2 {
                 match funct7 {
                     // LR.W: funct7=0x02, rs2=0
@@ -209,8 +207,8 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             } else {
                 None
             }
-        },
-        
+        }
+
         // EDUCATIONAL: Immediate operations (I-type)
         // These instructions use rs1, immediate, and rd
         Opcode::OpImm => {
@@ -219,30 +217,30 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             match funct3 {
                 // EDUCATIONAL: Basic immediate arithmetic
                 0x0 => Some(Instruction::Addi { rd, rs1, imm }),
-                
+
                 // EDUCATIONAL: Immediate comparisons
                 0x2 => Some(Instruction::Slti { rd, rs1, imm }),
                 0x3 => Some(Instruction::Sltiu { rd, rs1, imm }),
-                
+
                 // EDUCATIONAL: Immediate logical operations
                 0x4 => Some(Instruction::Xori { rd, rs1, imm }),
                 0x6 => Some(Instruction::Ori { rd, rs1, imm }),
                 0x7 => Some(Instruction::Andi { rd, rs1, imm }),
-                
+
                 // EDUCATIONAL: Immediate shifts (use only bottom 5 bits of immediate)
-                0x1 => Some(Instruction::Slli { 
+                0x1 => Some(Instruction::Slli {
                     rd,
                     rs1,
-                    shamt: (imm & 0x1f) as u8,  // Only bottom 5 bits for shift amount
+                    shamt: (imm & 0x1f) as u8, // Only bottom 5 bits for shift amount
                 }),
                 0x5 => match funct7 {
                     // EDUCATIONAL: Logical vs arithmetic right shift
-                    0x00 => Some(Instruction::Srli { 
+                    0x00 => Some(Instruction::Srli {
                         rd,
                         rs1,
                         shamt: (imm & 0x1f) as u8,
                     }),
-                    0x20 => Some(Instruction::Srai { 
+                    0x20 => Some(Instruction::Srai {
                         rd,
                         rs1,
                         shamt: (imm & 0x1f) as u8,
@@ -251,41 +249,52 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 },
                 _ => None,
             }
+        }
 
-        },
-        
         // EDUCATIONAL: Load operations (I-type)
         // Load data from memory into register
         Opcode::Load => {
             // EDUCATIONAL: Sign-extend 12-bit immediate for address offset
             let imm = (word as i32) >> 20;
             match funct3 {
-                0x0 => Some(Instruction::Lb {  // Load byte (8-bit, sign-extended)
+                0x0 => Some(Instruction::Lb {
+                    // Load byte (8-bit, sign-extended)
                     rd,
                     rs1,
                     offset: imm,
                 }),
-                0x1 => Some(Instruction::Lh {  // Load halfword (16-bit)
+                0x1 => Some(Instruction::Lh {
+                    // Load halfword (16-bit)
                     rd,
                     rs1,
                     offset: imm,
                 }),
-                0x2 => Some(Instruction::Lw {  // Load word (32-bit)
-                    rd, 
-                    rs1, 
-                    offset: imm, 
-                }),
-                0x3 => Some(Instruction::Ld {  // Load doubleword (64-bit)
+                0x2 => Some(Instruction::Lw {
+                    // Load word (32-bit)
                     rd,
                     rs1,
                     offset: imm,
                 }),
-                0x4 => Some(Instruction::Lbu { rd, rs1, offset: imm }), // Load byte unsigned
-                0x5 => Some(Instruction::Lhu { rd, rs1, offset: imm }), // Load halfword unsigned
+                0x3 => Some(Instruction::Ld {
+                    // Load doubleword (64-bit)
+                    rd,
+                    rs1,
+                    offset: imm,
+                }),
+                0x4 => Some(Instruction::Lbu {
+                    rd,
+                    rs1,
+                    offset: imm,
+                }), // Load byte unsigned
+                0x5 => Some(Instruction::Lhu {
+                    rd,
+                    rs1,
+                    offset: imm,
+                }), // Load halfword unsigned
                 _ => None,
             }
-        },
-        
+        }
+
         // EDUCATIONAL: Store operations (S-type)
         // Store data from register to memory
         Opcode::Store => {
@@ -296,109 +305,118 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             let imm = ((imm11_5 | imm4_0) as i32) << 20 >> 20; // sign-extend 12-bit
 
             match funct3 {
-                0x0 => Some(Instruction::Sb {  // Store byte (8-bit)
-                    rs1, 
-                    rs2, 
+                0x0 => Some(Instruction::Sb {
+                    // Store byte (8-bit)
+                    rs1,
+                    rs2,
                     offset: imm,
                 }),
-                0x1 => Some(Instruction::Sh {  // Store halfword (16-bit)
-                    rs1, 
-                    rs2, 
+                0x1 => Some(Instruction::Sh {
+                    // Store halfword (16-bit)
+                    rs1,
+                    rs2,
                     offset: imm,
                 }),
-                0x2 => Some(Instruction::Sw {  // Store word (32-bit)
-                    rs1, 
-                    rs2, 
+                0x2 => Some(Instruction::Sw {
+                    // Store word (32-bit)
+                    rs1,
+                    rs2,
                     offset: imm,
                 }),
                 _ => None,
             }
-        },
-        
+        }
+
         // EDUCATIONAL: Branch operations (B-type)
         // Conditional jumps based on register comparison
         Opcode::Branch => {
             // EDUCATIONAL: B-type immediates are also split and sign-extended
             let imm = extract_branch_offset(word);
             match funct3 {
-                0x0 => Some(Instruction::Beq {  // Branch if equal
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
-                }),
-                0x1 => Some(Instruction::Bne {  // Branch if not equal
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
-                }),
-                0x4 => Some(Instruction::Blt {  // Branch if less than (signed)
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
-                }),
-                0x5 => Some(Instruction::Bge {  // Branch if greater/equal (signed)
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
-                }),
-                0x6 => Some(Instruction::Bltu {  // Branch if less than (unsigned)
+                0x0 => Some(Instruction::Beq {
+                    // Branch if equal
                     rs1,
                     rs2,
                     offset: imm,
                 }),
-                0x7 => Some(Instruction::Bgeu {  // Branch if greater/equal (unsigned)
+                0x1 => Some(Instruction::Bne {
+                    // Branch if not equal
+                    rs1,
+                    rs2,
+                    offset: imm,
+                }),
+                0x4 => Some(Instruction::Blt {
+                    // Branch if less than (signed)
+                    rs1,
+                    rs2,
+                    offset: imm,
+                }),
+                0x5 => Some(Instruction::Bge {
+                    // Branch if greater/equal (signed)
+                    rs1,
+                    rs2,
+                    offset: imm,
+                }),
+                0x6 => Some(Instruction::Bltu {
+                    // Branch if less than (unsigned)
+                    rs1,
+                    rs2,
+                    offset: imm,
+                }),
+                0x7 => Some(Instruction::Bgeu {
+                    // Branch if greater/equal (unsigned)
                     rs1,
                     rs2,
                     offset: imm,
                 }),
                 _ => None,
             }
-        },
-        
+        }
+
         // EDUCATIONAL: Jump and Link (J-type)
         // Unconditional jump with return address saved
         Opcode::Jal => {
             // EDUCATIONAL: J-type immediates are 20-bit signed values
             let imm = extract_jal_offset(word);
-            Some(Instruction::Jal { 
-                rd, 
-                offset: imm, 
+            Some(Instruction::Jal {
+                rd,
+                offset: imm,
                 compressed: false,
             })
-        },
-        
+        }
+
         // EDUCATIONAL: Jump and Link Register (I-type)
         // Indirect jump with return address saved
         Opcode::Jalr => {
             // EDUCATIONAL: 12-bit signed immediate for address offset
             let imm = (word as i32) >> 20;
-            Some(Instruction::Jalr { 
-                rd, 
-                rs1, 
-                offset: imm, 
+            Some(Instruction::Jalr {
+                rd,
+                rs1,
+                offset: imm,
                 compressed: false,
             })
-        },
-        
+        }
+
         // EDUCATIONAL: Load Upper Immediate (U-type)
         // Load 20-bit immediate into upper bits of register
         Opcode::Lui => {
             // EDUCATIONAL: 20-bit immediate goes into bits 31:12
             let imm = ((word >> 12) & 0xFFFFF) as i32;
-            Some(Instruction::Lui { 
+            Some(Instruction::Lui {
                 rd,
-                imm: imm as i32, 
+                imm: imm as i32,
             })
-        },
-        
+        }
+
         // EDUCATIONAL: Add Upper Immediate to PC (U-type)
         // PC-relative addressing for position-independent code
         Opcode::Auipc => {
             // EDUCATIONAL: 20-bit immediate added to PC (bits 31:12)
             let imm = ((word >> 12) & 0xfffff) as i32;
             Some(Instruction::Auipc { rd, imm })
-        },
-        
+        }
+
         // EDUCATIONAL: System instructions (ecall/ebreak and CSRs)
         Opcode::System => {
             let funct3 = (word >> 12) & 0x7;
@@ -416,12 +434,48 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                         _ => None,
                     }
                 }
-                1 => Some(Instruction::Csr { rd, rs1, csr: csr as u16, op: CsrOp::Csrrw, imm: false }),
-                2 => Some(Instruction::Csr { rd, rs1, csr: csr as u16, op: CsrOp::Csrrs, imm: false }),
-                3 => Some(Instruction::Csr { rd, rs1, csr: csr as u16, op: CsrOp::Csrrc, imm: false }),
-                5 => Some(Instruction::Csr { rd, rs1, csr: csr as u16, op: CsrOp::Csrrw, imm: true }),
-                6 => Some(Instruction::Csr { rd, rs1, csr: csr as u16, op: CsrOp::Csrrs, imm: true }),
-                7 => Some(Instruction::Csr { rd, rs1, csr: csr as u16, op: CsrOp::Csrrc, imm: true }),
+                1 => Some(Instruction::Csr {
+                    rd,
+                    rs1,
+                    csr: csr as u16,
+                    op: CsrOp::Csrrw,
+                    imm: false,
+                }),
+                2 => Some(Instruction::Csr {
+                    rd,
+                    rs1,
+                    csr: csr as u16,
+                    op: CsrOp::Csrrs,
+                    imm: false,
+                }),
+                3 => Some(Instruction::Csr {
+                    rd,
+                    rs1,
+                    csr: csr as u16,
+                    op: CsrOp::Csrrc,
+                    imm: false,
+                }),
+                5 => Some(Instruction::Csr {
+                    rd,
+                    rs1,
+                    csr: csr as u16,
+                    op: CsrOp::Csrrw,
+                    imm: true,
+                }),
+                6 => Some(Instruction::Csr {
+                    rd,
+                    rs1,
+                    csr: csr as u16,
+                    op: CsrOp::Csrrs,
+                    imm: true,
+                }),
+                7 => Some(Instruction::Csr {
+                    rd,
+                    rs1,
+                    csr: csr as u16,
+                    op: CsrOp::Csrrc,
+                    imm: true,
+                }),
                 _ => None,
             }
         }
@@ -472,14 +526,12 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
         CompressedOpcode::LuiOrAddi16sp => {
             if rd == 2 {
                 // C.ADDI16SP
-                let imm2 = (
-                    ((hword >> 12) & 0x1) << 9  | 
-                    ((hword >> 6)  & 0x1) << 4  | 
-                    ((hword >> 5)  & 0x1) << 6  |
-                    ((hword >> 4)  & 0x1) << 8  | 
-                    ((hword >> 3)  & 0x1) << 7  | 
-                    ((hword >> 2)  & 0x1) << 5    
-                ) as i32;
+                let imm2 = (((hword >> 12) & 0x1) << 9
+                    | ((hword >> 6) & 0x1) << 4
+                    | ((hword >> 5) & 0x1) << 6
+                    | ((hword >> 4) & 0x1) << 8
+                    | ((hword >> 3) & 0x1) << 7
+                    | ((hword >> 2) & 0x1) << 5) as i32;
 
                 // Sign-extend 10-bit immediate
                 let imm = (imm2 << 22) >> 22;
@@ -487,19 +539,22 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
                 Some(Instruction::Addi16sp { imm })
             } else if rd != 0 {
                 // C.LUI
-                // According to spec: 
+                // According to spec:
                 // - imm[5] (bit 12) = nzimm[17] (sign bit)
                 // - imm[4:0] (bits 6:2) = nzimm[16:12]
                 let nzimm_17 = (hword >> 12) & 0x1; // nzimm[17] from bit 12
                 let nzimm_16_12 = (hword >> 2) & 0x1F; // nzimm[16:12] from bits 6:2
                 let nzimm = (nzimm_17 << 5) | nzimm_16_12; // Combine into 6-bit nzimm[17:12]
-                
+
                 // C.LUI expands into lui rd, nzimm[17:12]
-                // The 6-bit nzimm is used as imm[17:12] of the 20-bit LUI immediate                
+                // The 6-bit nzimm is used as imm[17:12] of the 20-bit LUI immediate
                 // Sign-extend bit 17 (nzimm[17]) into all higher bits [31:18]
                 let signed_nzimm = ((nzimm as i32) << 26) >> 26;
-                
-                Some(Instruction::Lui { rd, imm: signed_nzimm})
+
+                Some(Instruction::Lui {
+                    rd,
+                    imm: signed_nzimm,
+                })
             } else {
                 None
             }
@@ -512,52 +567,67 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
                 return None; // reserved
             }
 
-            let imm =
-                ((hword >> 12) & 0b1) << 5  | // imm[5]  from bit 12
+            let imm = ((hword >> 12) & 0b1) << 5  | // imm[5]  from bit 12
                 ((hword >> 11) & 0b1) << 4  | // imm[4]  from bit 11
                 ((hword >> 10) & 0b1) << 9  | // imm[9]  from bit 10
                 ((hword >>  9) & 0b1) << 8  | // imm[8]  from bit 9
                 ((hword >>  8) & 0b1) << 7  | // imm[7]  from bit 8
                 ((hword >>  7) & 0b1) << 6  | // imm[6]  from bit 7
                 ((hword >>  6) & 0b1) << 2  | // imm[2]  from bit 6
-                ((hword >>  5) & 0b1) << 3;   // imm[3]  from bit 5
+                ((hword >>  5) & 0b1) << 3; // imm[3]  from bit 5
 
             if imm == 0 {
                 return None; // nzuimm must be non-zero
             }
 
-            Some(Instruction::Addi4spn { rd: _rd as usize, imm: imm as u32 })
+            Some(Instruction::Addi4spn {
+                rd: _rd as usize,
+                imm: imm as u32,
+            })
         }
 
         CompressedOpcode::Jal => {
             let imm = decode_cj_imm(hword); // implement CJ immediate decoder
-            Some(Instruction::Jal { rd: 1, offset: imm, compressed: true }) // rd = x1
+            Some(Instruction::Jal {
+                rd: 1,
+                offset: imm,
+                compressed: true,
+            }) // rd = x1
         }
 
         CompressedOpcode::J => {
             let imm = decode_cj_imm(hword);
-            Some(Instruction::Jal { rd: 0, offset: imm, compressed: true }) // jump without link
+            Some(Instruction::Jal {
+                rd: 0,
+                offset: imm,
+                compressed: true,
+            }) // jump without link
         }
 
         CompressedOpcode::RegOrJump => {
-            let bit12  = (hword >> 12) & 0b1;
-            
+            let bit12 = (hword >> 12) & 0b1;
+
             // === EBREAK: rs1 = 0 and rs2 = 0 (regardless of bit12) ===
             if rs1 == 0 && rs2 == 0 {
                 return Some(Instruction::Ebreak);
             }
-            
+
             if bit12 == 0 {
                 // === Bit 12 = 0: JR, RET, MV ===
                 match (rs1, rs2) {
-                    (1, 0) => Some(Instruction::Ret),                       // C.RET
-                    (rs1, 0) => Some(Instruction::Jr { rs1 }),              // C.JR
-                    (rd, rs2) => Some(Instruction::Mv { rd, rs2 }),        // C.MV
+                    (1, 0) => Some(Instruction::Ret),               // C.RET
+                    (rs1, 0) => Some(Instruction::Jr { rs1 }),      // C.JR
+                    (rd, rs2) => Some(Instruction::Mv { rd, rs2 }), // C.MV
                 }
             } else {
                 // === Bit 12 = 1: JALR, ADD ===
                 match (rs1, rs2) {
-                    (_, 0) => Some(Instruction::Jalr { rd: 1, rs1: rs1, offset: 0, compressed: true }), // C.JALR (implicit rd = x1)
+                    (_, 0) => Some(Instruction::Jalr {
+                        rd: 1,
+                        rs1: rs1,
+                        offset: 0,
+                        compressed: true,
+                    }), // C.JALR (implicit rd = x1)
                     (rd, rs2) => Some(Instruction::Add { rd, rs1: rd, rs2 }), // C.ADD
                 }
             }
@@ -565,7 +635,11 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
 
         CompressedOpcode::Slli => {
             let shamt = ((hword >> 2) & 0b11111) as u8;
-            Some(Instruction::Slli { rd, rs1, shamt: shamt }) // emulate as ADDI with left shift beforehand
+            Some(Instruction::Slli {
+                rd,
+                rs1,
+                shamt: shamt,
+            }) // emulate as ADDI with left shift beforehand
         }
 
         CompressedOpcode::Lwsp => {
@@ -575,32 +649,35 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             }
 
             // Reconstruct immediate as: [7:6][5][4:2]
-            let imm =
-                ((hword >> 2) & 0b11) << 6   // bits 3:2 -> imm[7:6]
+            let imm = ((hword >> 2) & 0b11) << 6   // bits 3:2 -> imm[7:6]
             | ((hword >> 12) & 0x1) << 5   // bit 12   -> imm[5]
             | ((hword >> 4) & 0b111) << 2; // bits 6:4 -> imm[4:2]
 
             let imm = imm as i32;
 
-            Some(Instruction::Lw { rd, rs1: 2, offset: imm }) // x2 is sp
+            Some(Instruction::Lw {
+                rd,
+                rs1: 2,
+                offset: imm,
+            }) // x2 is sp
         }
-
 
         CompressedOpcode::Beqz | CompressedOpcode::Bnez => {
             let rs1 = 8 + ((hword >> 7) & 0b111) as usize; // rs1' field
-            
+
             // Decode CB-format immediate for compressed branches
             let imm = (
                 ((hword >> 12) & 0x1) << 8 |  // imm[8]
                 ((hword >> 10) & 0x3) << 3 |  // imm[4:3]
                 ((hword >> 5) & 0x3) << 6 |   // imm[7:6]
                 ((hword >> 3) & 0x3) << 1 |   // imm[2:1]
-                ((hword >> 2) & 0x1) << 5     // imm[5]
+                ((hword >> 2) & 0x1) << 5
+                // imm[5]
             ) as i32;
-            
+
             // Sign extend the 9-bit immediate
             let imm = (imm << 23) >> 23;
-            
+
             match op {
                 CompressedOpcode::Beqz => Some(Instruction::Beqz { rs1, offset: imm }),
                 CompressedOpcode::Bnez => Some(Instruction::Bnez { rs1, offset: imm }),
@@ -609,14 +686,14 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
         }
 
         CompressedOpcode::Sw => {
-            let rd_ = ((hword >> 2) & 0b111) + 8;   // rs2'
-            let rs1_ = ((hword >> 7) & 0b111) + 8;  // rs1'
-            
+            let rd_ = ((hword >> 2) & 0b111) + 8; // rs2'
+            let rs1_ = ((hword >> 7) & 0b111) + 8; // rs1'
+
             // Fix: Correct immediate extraction for C.SW according to RISC-V spec
             // imm[6] from bit 5, imm[5:3] from bits 12-10, imm[2] from bit 6
             let imm = ((hword >> 5) & 0b1) << 6      // imm[6] from bit 5
                     | ((hword >> 10) & 0b111) << 3    // imm[5:3] from bits 12-10
-                    | ((hword >> 6) & 0b1) << 2;      // imm[2] from bit 6
+                    | ((hword >> 6) & 0b1) << 2; // imm[2] from bit 6
             let offset = imm as i32; // no sign-extension needed
 
             Some(Instruction::Sw {
@@ -627,13 +704,13 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
         }
 
         CompressedOpcode::Lw => {
-            let rd_ = ((hword >> 2) & 0b111) + 8;    // rd'
-            let rs1_ = ((hword >> 7) & 0b111) + 8;   // rs1'
+            let rd_ = ((hword >> 2) & 0b111) + 8; // rd'
+            let rs1_ = ((hword >> 7) & 0b111) + 8; // rs1'
 
             // imm[5|4:3|2] → bits: [5] bit 5 = bit 5, [4:3] bits 11:10, [2] bit 6
             let imm = ((hword >> 6) & 0b1) << 2      // imm[2]
                     | ((hword >> 10) & 0b11) << 3    // imm[4:3]
-                    | ((hword >> 5) & 0b1) << 6;     // imm[5]
+                    | ((hword >> 5) & 0b1) << 6; // imm[5]
 
             let offset = imm as i32;
 
@@ -645,12 +722,12 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
         }
 
         // ...other compressed cases...
-        CompressedOpcode::MiscAlu => {        
+        CompressedOpcode::MiscAlu => {
             let funct2 = (hword >> 10) & 0b11; // bits 11–10
             let bit12 = (hword >> 12) & 0x1;
             let rd = 8 + ((hword >> 7) & 0b111) as usize;
             let rs2 = 8 + ((hword >> 2) & 0b111) as usize;
-        
+
             match funct2 {
                 0b00 => {
                     // C.SRLI
@@ -681,7 +758,7 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
                 }
                 _ => None,
             }
-        }        
+        }
 
         CompressedOpcode::Swsp => {
             let rs2 = ((hword >> 2) & 0x1F) as usize;
@@ -691,7 +768,7 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
                 (((hword >> 10) & 0x1) << 3) | // bit 10 → imm[3]
                 (((hword >>  9) & 0x1) << 2) | // bit 9  → imm[2]
                 (((hword >>  8) & 0x1) << 7) | // bit 8  → imm[7]
-                (((hword >>  7) & 0x1) << 6);  // bit 7  → imm[6]
+                (((hword >>  7) & 0x1) << 6); // bit 7  → imm[6]
 
             let offset = imm as i32;
 
@@ -705,16 +782,14 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
 }
 
 fn decode_cj_imm(hword: u16) -> i32 {
-    let imm = (
-        ((hword >> 12) & 0b1) << 11 |
-        ((hword >> 11) & 0b1) << 4  |
-        ((hword >> 9)  & 0b11) << 8 |
-        ((hword >> 8)  & 0b1) << 10 |
-        ((hword >> 7)  & 0b1) << 6  |
-        ((hword >> 6)  & 0b1) << 7  |
-        ((hword >> 3)  & 0b111) << 1 |
-        ((hword >> 2)  & 0b1) << 5
-    ) as i32;
+    let imm = (((hword >> 12) & 0b1) << 11
+        | ((hword >> 11) & 0b1) << 4
+        | ((hword >> 9) & 0b11) << 8
+        | ((hword >> 8) & 0b1) << 10
+        | ((hword >> 7) & 0b1) << 6
+        | ((hword >> 6) & 0b1) << 7
+        | ((hword >> 3) & 0b111) << 1
+        | ((hword >> 2) & 0b1) << 5) as i32;
     (imm << 20) >> 20 // sign-extend 12-bit
 }
 

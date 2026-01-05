@@ -1,10 +1,10 @@
 use core::{cmp, marker::PhantomData, ptr};
 
-use crate::global::{PAGE_ALLOC, ROOT_PPN};
 use crate::BootInfo;
+use crate::global::{PAGE_ALLOC, ROOT_PPN};
 use types::{
-    Sv32PagePerms, Sv32PageTable, SV32_DIRECT_MAP_BASE, SV32_PAGE_SIZE, SV32_VPN_MASK, map_allocating,
-    SV32_PTE_R, SV32_PTE_W, SV32_PTE_X, SV32_PTE_V, SV32_PTE_U, map_to_physical,
+    SV32_DIRECT_MAP_BASE, SV32_PAGE_SIZE, SV32_PTE_R, SV32_PTE_U, SV32_PTE_V, SV32_PTE_W,
+    SV32_PTE_X, SV32_VPN_MASK, Sv32PagePerms, Sv32PageTable, map_allocating, map_to_physical,
 };
 
 const PAGE_SIZE: usize = SV32_PAGE_SIZE;
@@ -159,7 +159,12 @@ pub fn map_user_range(va_start: u32, len: usize, perms: PagePerms) -> bool {
 }
 
 /// Map a kernel-only virtual range with the provided permissions into a specific root.
-pub fn map_kernel_range_for_root(root_ppn: u32, va_start: u32, len: usize, perms: PagePerms) -> bool {
+pub fn map_kernel_range_for_root(
+    root_ppn: u32,
+    va_start: u32,
+    len: usize,
+    perms: PagePerms,
+) -> bool {
     let alloc = unsafe { PAGE_ALLOC.get_mut() };
     match alloc {
         Some(alloc) => {
@@ -196,7 +201,12 @@ pub fn map_physical_range_for_root(
 
 /// Mirror a mapped user range from `user_root` into the current kernel root so the
 /// kernel can execute the user program without switching satp.
-pub fn mirror_user_range_into_kernel(user_root: u32, va_start: u32, len: usize, perms: PagePerms) -> bool {
+pub fn mirror_user_range_into_kernel(
+    user_root: u32,
+    va_start: u32,
+    len: usize,
+    perms: PagePerms,
+) -> bool {
     if len == 0 {
         return true;
     }
@@ -232,16 +242,14 @@ pub fn translate(root_ppn: u32, va: u32) -> Option<usize> {
     let vpn0 = (va >> 12) & SV32_VPN_MASK;
     let offset = (va & 0xfff) as usize;
 
-    let l1_base = (root_ppn as usize)
-        .checked_mul(PAGE_SIZE)?;
+    let l1_base = (root_ppn as usize).checked_mul(PAGE_SIZE)?;
     let l1_addr = l1_base + vpn1 as usize * core::mem::size_of::<u32>();
     let l1_pte = read_pte(l1_addr)?;
     if l1_pte & SV32_PTE_V == 0 || l1_pte & (SV32_PTE_R | SV32_PTE_W | SV32_PTE_X) != 0 {
         return None;
     }
 
-    let l2_base = ((l1_pte >> 10) as usize)
-        .checked_mul(PAGE_SIZE)?;
+    let l2_base = ((l1_pte >> 10) as usize).checked_mul(PAGE_SIZE)?;
     let l2_addr = l2_base + vpn0 as usize * core::mem::size_of::<u32>();
     let l2_pte = read_pte(l2_addr)?;
     if l2_pte & SV32_PTE_V == 0 {
@@ -256,16 +264,14 @@ fn leaf_pte(root_ppn: u32, va: u32) -> Option<u32> {
     let vpn1 = (va >> 22) & SV32_VPN_MASK;
     let vpn0 = (va >> 12) & SV32_VPN_MASK;
 
-    let l1_base = (root_ppn as usize)
-        .checked_mul(PAGE_SIZE)?;
+    let l1_base = (root_ppn as usize).checked_mul(PAGE_SIZE)?;
     let l1_addr = l1_base + vpn1 as usize * core::mem::size_of::<u32>();
     let l1_pte = read_pte(l1_addr)?;
     if l1_pte & SV32_PTE_V == 0 || l1_pte & (SV32_PTE_R | SV32_PTE_W | SV32_PTE_X) != 0 {
         return None;
     }
 
-    let l2_base = ((l1_pte >> 10) as usize)
-        .checked_mul(PAGE_SIZE)?;
+    let l2_base = ((l1_pte >> 10) as usize).checked_mul(PAGE_SIZE)?;
     let l2_addr = l2_base + vpn0 as usize * core::mem::size_of::<u32>();
     let l2_pte = read_pte(l2_addr)?;
     if l2_pte & SV32_PTE_V == 0 {
@@ -301,11 +307,7 @@ pub fn copy(root_ppn: u32, va_start: u32, data: &[u8]) -> bool {
             None => return false,
         };
         unsafe {
-            ptr::copy_nonoverlapping(
-                data.as_ptr().add(src_off),
-                dst as *mut u8,
-                to_copy,
-            );
+            ptr::copy_nonoverlapping(data.as_ptr().add(src_off), dst as *mut u8, to_copy);
         }
         remaining -= to_copy;
         src_off += to_copy;
@@ -359,11 +361,7 @@ pub fn copy_user(root_ppn: u32, va_start: u32, data: &[u8]) -> bool {
             None => return false,
         };
         unsafe {
-            ptr::copy_nonoverlapping(
-                data.as_ptr().add(src_off),
-                dst as *mut u8,
-                to_copy,
-            );
+            ptr::copy_nonoverlapping(data.as_ptr().add(src_off), dst as *mut u8, to_copy);
         }
         remaining -= to_copy;
         src_off += to_copy;
@@ -447,9 +445,7 @@ fn overwrite_map_page(
     let vpn1 = (va >> 22) & SV32_VPN_MASK;
     let vpn0 = (va >> 12) & SV32_VPN_MASK;
 
-    let root_base = (root_ppn as usize)
-        .checked_mul(page_size)
-        .unwrap();
+    let root_base = (root_ppn as usize).checked_mul(page_size).unwrap();
     let l1_addr = root_base + vpn1 as usize * core::mem::size_of::<u32>();
     let mut l1_pte = read_pte(l1_addr).unwrap_or(0);
     if l1_pte & SV32_PTE_V == 0 {
@@ -464,9 +460,7 @@ fn overwrite_map_page(
         return false;
     }
 
-    let l2_base = ((l1_pte >> 10) as usize)
-        .checked_mul(page_size)
-        .unwrap();
+    let l2_base = ((l1_pte >> 10) as usize).checked_mul(page_size).unwrap();
     let l2_addr = l2_base + vpn0 as usize * core::mem::size_of::<u32>();
 
     let leaf_ppn = phys_start / page_size as u32;

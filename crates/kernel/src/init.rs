@@ -4,8 +4,8 @@ use clibc::{log, logf};
 use state::State;
 
 use kernel::global::STATE;
-use kernel::{BootInfo, trap};
 use kernel::memory::{heap, page_allocator};
+use kernel::{BootInfo, trap};
 
 /// Initialize kernel state from the bootloader handoff and optional state blob.
 pub fn init_kernel(state_ptr: *const u8, state_len: usize, boot_info_ptr: *const BootInfo) {

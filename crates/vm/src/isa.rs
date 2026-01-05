@@ -1,13 +1,13 @@
 /// EDUCATIONAL: RISC-V Instruction Set Architecture (ISA) Opcodes
-/// 
+///
 /// This enum defines the primary opcodes used in RISC-V instruction encoding.
 /// Each opcode represents a category of instructions that share the same basic format.
-/// 
+///
 /// RISC-V INSTRUCTION ENCODING:
 /// - All RISC-V instructions are 32 bits (or 16 bits for compressed instructions)
 /// - The bottom 7 bits contain the opcode, which determines the instruction format
 /// - Different opcodes use different instruction formats (R, I, S, B, U, J)
-/// 
+///
 /// INSTRUCTION FORMATS:
 /// - R-type: Register operations (ADD, SUB, AND, OR, etc.)
 /// - I-type: Immediate operations (ADDI, LW, JALR, etc.)
@@ -15,7 +15,7 @@
 /// - B-type: Branch operations (BEQ, BNE, BLT, etc.)
 /// - U-type: Upper immediate operations (LUI, AUIPC)
 /// - J-type: Jump operations (JAL)
-/// 
+///
 /// REAL-WORLD CONTEXT: In actual RISC-V processors, these opcodes are encoded
 /// as binary values in the instruction word. The decoder uses these opcodes
 /// to determine how to interpret the rest of the instruction bits.
@@ -91,30 +91,28 @@ pub enum Opcode {
 
 impl Opcode {
     /// EDUCATIONAL: Convert a raw byte value to an Opcode enum
-    /// 
+    ///
     /// This function takes a byte value and attempts to match it to a valid RISC-V opcode.
     /// If the value doesn't correspond to a known opcode, it returns None.
-    /// 
+    ///
     /// REAL-WORLD CONTEXT: In actual RISC-V processors, this conversion happens
     /// in the instruction decoder hardware, which extracts the opcode bits from
     /// the instruction word and routes the instruction to the appropriate execution unit.
     pub fn from_u8(value: u8) -> Option<Self> {
         use Opcode::*;
         Some(match value {
-            0x03 => Load,    // Load instructions (LW, LH, LB, etc.)
-            0x23 => Store,   // Store instructions (SW, SH, SB, etc.)
-            0x63 => Branch,  // Branch instructions (BEQ, BNE, BLT, etc.)
-            0x6f => Jal,     // Jump and Link (unconditional jump)
-            0x67 => Jalr,    // Jump and Link Register (indirect jump)
-            0x13 => OpImm,   // Immediate operations (ADDI, ANDI, etc.)
-            0x33 => Op,      // Register operations (ADD, SUB, AND, etc.)
-            0x37 => Lui,     // Load Upper Immediate
-            0x17 => Auipc,   // Add Upper Immediate to PC
-            0x73 => System,  // System instructions (ECALL, EBREAK)
-            0x2f => Amo,     // Atomic Memory Operations
+            0x03 => Load,     // Load instructions (LW, LH, LB, etc.)
+            0x23 => Store,    // Store instructions (SW, SH, SB, etc.)
+            0x63 => Branch,   // Branch instructions (BEQ, BNE, BLT, etc.)
+            0x6f => Jal,      // Jump and Link (unconditional jump)
+            0x67 => Jalr,     // Jump and Link Register (indirect jump)
+            0x13 => OpImm,    // Immediate operations (ADDI, ANDI, etc.)
+            0x33 => Op,       // Register operations (ADD, SUB, AND, etc.)
+            0x37 => Lui,      // Load Upper Immediate
+            0x17 => Auipc,    // Add Upper Immediate to PC
+            0x73 => System,   // System instructions (ECALL, EBREAK)
+            0x2f => Amo,      // Atomic Memory Operations
             _ => return None, // Unknown opcode
         })
     }
 }
-
-

@@ -96,7 +96,10 @@ fn add_liquidity(program: Address, caller: Address, mut parser: DataParser) -> R
     let minted = if pool.total_liquidity == 0 {
         am_in as u128
     } else {
-        require(pool.reserve_am > 0 && pool.reserve_token > 0, b"add: pool empty");
+        require(
+            pool.reserve_am > 0 && pool.reserve_token > 0,
+            b"add: pool empty",
+        );
         require(
             token_in * pool.reserve_am == (am_in as u128) * pool.reserve_token,
             b"add: ratio mismatch",

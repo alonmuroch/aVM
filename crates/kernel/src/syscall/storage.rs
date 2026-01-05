@@ -4,12 +4,12 @@ use alloc::{format, string::String, vec, vec::Vec};
 use core::cmp;
 
 use clibc::{log, logf};
-use types::{Address, ADDRESS_LEN, SV32_DIRECT_MAP_BASE, SV32_PAGE_SIZE};
+use types::{ADDRESS_LEN, Address, SV32_DIRECT_MAP_BASE, SV32_PAGE_SIZE};
 
+use crate::global::TO_PTR_ADDR;
 use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, STATE, TASKS};
 use crate::memory::page_allocator as mmu;
 use crate::syscall::alloc::sys_alloc;
-use crate::global::TO_PTR_ADDR;
 use state::State;
 
 pub(crate) fn sys_storage_get(args: [u32; 6]) -> u32 {

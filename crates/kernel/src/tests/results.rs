@@ -7,10 +7,7 @@ pub struct TestResults {
 
 impl TestResults {
     pub const fn pass(detail: u32) -> Self {
-        Self {
-            status: 0,
-            detail,
-        }
+        Self { status: 0, detail }
     }
 }
 

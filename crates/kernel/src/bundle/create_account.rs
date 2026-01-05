@@ -1,6 +1,6 @@
-use kernel::global::{CODE_SIZE_LIMIT, RO_DATA_SIZE_LIMIT, STATE};
 use clibc::logf;
 use clibc::parser::HexCodec;
+use kernel::global::{CODE_SIZE_LIMIT, RO_DATA_SIZE_LIMIT, STATE};
 use state::State;
 use types::transaction::Transaction;
 

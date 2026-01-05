@@ -88,20 +88,15 @@ impl TransactionReceipt {
         let mut from = [0u8; 20];
         from.copy_from_slice(read(20)?);
 
-        let data_len =
-            u32::from_le_bytes(read(4)?.try_into().ok()?) as usize;
+        let data_len = u32::from_le_bytes(read(4)?.try_into().ok()?) as usize;
         let data = read(data_len)?.to_vec();
 
-        let value =
-            u64::from_le_bytes(read(8)?.try_into().ok()?);
-        let nonce =
-            u64::from_le_bytes(read(8)?.try_into().ok()?);
+        let value = u64::from_le_bytes(read(8)?.try_into().ok()?);
+        let nonce = u64::from_le_bytes(read(8)?.try_into().ok()?);
 
         let success = *read(1)?.first()? != 0;
-        let error_code =
-            u32::from_le_bytes(read(4)?.try_into().ok()?);
-        let result_data_len =
-            u32::from_le_bytes(read(4)?.try_into().ok()?);
+        let error_code = u32::from_le_bytes(read(4)?.try_into().ok()?);
+        let result_data_len = u32::from_le_bytes(read(4)?.try_into().ok()?);
         let result_len = result_data_len as usize;
         let result_data = read(result_len)?;
 
@@ -119,12 +114,10 @@ impl TransactionReceipt {
             result.data_len = crate::result::RESULT_DATA_SIZE as u32;
         }
 
-        let event_count =
-            u32::from_le_bytes(read(4)?.try_into().ok()?) as usize;
+        let event_count = u32::from_le_bytes(read(4)?.try_into().ok()?) as usize;
         let mut events = Vec::with_capacity(event_count);
         for _ in 0..event_count {
-            let len =
-                u32::from_le_bytes(read(4)?.try_into().ok()?) as usize;
+            let len = u32::from_le_bytes(read(4)?.try_into().ok()?) as usize;
             let bytes = read(len)?.to_vec();
             events.push(bytes);
         }
@@ -138,14 +131,7 @@ impl TransactionReceipt {
             nonce,
         };
 
-        Some((
-            TransactionReceipt {
-                tx,
-                result,
-                events,
-            },
-            cursor,
-        ))
+        Some((TransactionReceipt { tx, result, events }, cursor))
     }
 
     /// Encode a receipts list with a count prefix and per-receipt length.
@@ -171,12 +157,10 @@ impl TransactionReceipt {
             cursor += len;
             Some(slice)
         };
-        let count =
-            u32::from_le_bytes(read(4)?.try_into().ok()?) as usize;
+        let count = u32::from_le_bytes(read(4)?.try_into().ok()?) as usize;
         let mut receipts = Vec::with_capacity(count);
         for _ in 0..count {
-            let len =
-                u32::from_le_bytes(read(4)?.try_into().ok()?) as usize;
+            let len = u32::from_le_bytes(read(4)?.try_into().ok()?) as usize;
             let slice = read(len)?;
             let (receipt, consumed) = TransactionReceipt::decode(slice)?;
             if consumed != len {
