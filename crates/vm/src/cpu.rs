@@ -442,8 +442,8 @@ impl CPU {
     /// DEBUGGING: This function provides detailed information about what
     /// went wrong, including the hex dump of the invalid bytes.
     ///
-    /// RETURN VALUE: Returns false to halt execution on invalid instructions
-    fn unknown_instruction(&mut self, memory: Memory) -> bool {
+    /// RETURN VALUE: This method always panics and never returns.
+    fn unknown_instruction(&mut self, memory: Memory) -> ! {
         // EDUCATIONAL: Try to read the invalid instruction bytes for debugging
         if let Some(slice_ref) = memory.mem_slice(VirtualAddress(self.pc), VirtualAddress(self.pc.wrapping_add(4)))
         {
@@ -464,7 +464,6 @@ impl CPU {
                 self.pc
             );
         }
-        false
     }
 
     /// Fetches and decodes the next instruction from memory.

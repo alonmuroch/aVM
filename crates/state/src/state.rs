@@ -1,5 +1,5 @@
 use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
+use alloc::string::ToString;
 use alloc::vec::Vec;
 use crate::Account;
 use types::address::Address;

@@ -37,6 +37,12 @@ const REG_A7: usize = 17;
 const REG_SP: usize = 2;
 const REG_PC: usize = 32;
 
+#[repr(C)]
+struct TrapReturn {
+    sp: u32,
+    kind: u32,
+}
+
 /// Install the kernel trap vector and set up the kernel stack for traps.
 pub fn init_trap_vector(kstack_top: u32) {
     // Seed sscratch with the kernel stack top so trap entry can swap sp with
@@ -110,7 +116,7 @@ unsafe extern "C" fn return_from_trap() -> ! {
 /// laid out as:
 /// regs[0..32] = x0..x31, regs[32] = pc.
 #[unsafe(no_mangle)]
-pub extern "C" fn handle_trap(saved: *mut u32) -> (u32, u32) {
+pub extern "C" fn handle_trap(saved: *mut u32) -> TrapReturn {
     let regs = unsafe { core::slice::from_raw_parts_mut(saved, TRAP_FRAME_WORDS) };
     let scause = read_scause();
     let stval = read_stval();
@@ -230,7 +236,10 @@ pub extern "C" fn handle_trap(saved: *mut u32) -> (u32, u32) {
         }
         _ => log!("unhandled trap"),
     }
-    (return_sp, return_kind)
+    TrapReturn {
+        sp: return_sp,
+        kind: return_kind,
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -253,13 +262,6 @@ extern "C" fn ensure_kernel_root_for_trap() {
 fn read_scause() -> usize {
     let value: usize;
     unsafe { asm!("csrr {0}, scause", out(reg) value); }
-    value
-}
-
-#[inline(always)]
-fn read_satp() -> u32 {
-    let value: u32;
-    unsafe { asm!("csrr {0}, satp", out(reg) value); }
     value
 }
 

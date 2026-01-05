@@ -21,7 +21,6 @@ use call_program::sys_call_program;
 use fire_event::sys_fire_event;
 use panic::sys_panic;
 use storage::{sys_storage_get, sys_storage_set};
-pub(crate) use panic::sys_panic_with_message;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CallerMode {

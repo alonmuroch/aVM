@@ -1378,7 +1378,6 @@ impl CPU {
                     } // 1 = failure
                 }
             }
-            _ => todo!("unhandled instruction"),
         }
         true
     }

@@ -5,7 +5,7 @@ extern crate alloc;
 
 use core::slice;
 use kernel::BootInfo;
-use clibc::{log, logf};
+use clibc::log;
 
 mod init;
 mod bundle;

@@ -11,6 +11,7 @@ members = [
     "crates/vm",
     "aTester",
 ]
+resolver = "3"
 
 [profile.release]
 panic = "abort"

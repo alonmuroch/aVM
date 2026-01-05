@@ -1,4 +1,4 @@
-use core::{cmp, slice};
+use core::slice;
 
 use clibc::{log, logf};
 use state::State;
@@ -11,10 +11,8 @@ use kernel::memory::{heap, page_allocator};
 pub fn init_kernel(state_ptr: *const u8, state_len: usize, boot_info_ptr: *const BootInfo) {
     let boot_info = unsafe { boot_info_ptr.as_ref() };
     if let Some(info) = init_boot_info(boot_info) {
-        unsafe {
-            page_allocator::init(info);
-            heap::init(info.heap_ptr, info.va_base, info.va_len);
-        }
+        page_allocator::init(info);
+        heap::init(info.heap_ptr, info.va_base, info.va_len);
         trap::init_trap_vector(info.kstack_top);
         init_state(state_ptr, state_len);
     } else {

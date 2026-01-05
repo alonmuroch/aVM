@@ -94,7 +94,6 @@ fn execute_transaction(tx: &Transaction) -> bool {
             transfer(tx);
             true
         }
-        _ => panic!("unsupported transaction type"),
     }
 }
 
