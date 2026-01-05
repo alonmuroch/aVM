@@ -10,6 +10,8 @@ use kernel::memory::{heap, page_allocator};
 
 #[path = "../../tests/results.rs"]
 mod results;
+#[path = "../../tests/fail.rs"]
+mod fail;
 #[path = "../../tests/utils.rs"]
 mod utils;
 
@@ -26,16 +28,16 @@ pub extern "C" fn _start(
     let _input = unsafe { core::slice::from_raw_parts(input_ptr, input_len) };
 
     if let Err(code) = test_heap_alignment() {
-        utils::fail(code);
+        fail::fail(code);
     }
     if let Err(code) = test_heap_exhaustion(info) {
-        utils::fail(code);
+        fail::fail(code);
     }
     if let Err(code) = test_page_allocator_roots() {
-        utils::fail(code);
+        fail::fail(code);
     }
     if let Err(code) = test_heap_too_large() {
-        utils::fail(code);
+        fail::fail(code);
     }
 
     utils::pass();

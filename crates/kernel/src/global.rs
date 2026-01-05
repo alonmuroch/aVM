@@ -201,7 +201,7 @@ pub static ROOT_PPN: Global<u32> = Global::new(0);
 /// Page allocator backing store.
 pub static PAGE_ALLOC: Global<Option<PageAllocator>> = Global::new(None);
 /// Kernel heap allocator instance.
-pub static KERNEL_HEAP: Global<BumpAllocator> = Global::new(BumpAllocator::empty());
+pub(crate) static KERNEL_HEAP: Global<BumpAllocator> = Global::new(BumpAllocator::empty());
 
 const fn align_up(val: usize, align: usize) -> usize {
     (val + (align - 1)) & !(align - 1)

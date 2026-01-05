@@ -1,4 +1,3 @@
-use crate::global::Global;
 use core::alloc::{GlobalAlloc, Layout};
 use core::ptr;
 

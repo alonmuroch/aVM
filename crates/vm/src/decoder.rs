@@ -497,7 +497,7 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
                 // C.LUI expands into lui rd, nzimm[17:12]
                 // The 6-bit nzimm is used as imm[17:12] of the 20-bit LUI immediate                
                 // Sign-extend bit 17 (nzimm[17]) into all higher bits [31:18]
-                let signed_nzimm = (((nzimm as i32) << 26) >> 26);
+                let signed_nzimm = ((nzimm as i32) << 26) >> 26;
                 
                 Some(Instruction::Lui { rd, imm: signed_nzimm})
             } else {

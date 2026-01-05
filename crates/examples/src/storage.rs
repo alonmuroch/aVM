@@ -37,8 +37,8 @@ fn my_vm_entry(program: Address, _caller: Address, _data: &[u8]) -> Result {
     // ... change local copy ...
     user.level = 5;
     user.id = 40001;
-
-    // ... later ...
+    require(user.level == 5, b"user local level must be 5");
+    require(user.id == 40001, b"user local id must be 40001");
 
     let reloaded_user = User::load(&program).expect("user not found");
     require(reloaded_user.level == 4, b"user level must be 4");
@@ -60,8 +60,11 @@ fn my_vm_entry(program: Address, _caller: Address, _data: &[u8]) -> Result {
     // ... change local copy ...
     config.retries = 15;
     config.timeout_ms = 103000;
-
-    // ... later ...
+    require(config.retries == 15, b"config local retries must be 15");
+    require(
+        config.timeout_ms == 103000,
+        b"config local timeout_ms must be 103000",
+    );
 
     let reloaded_config = Config::load(&program).expect("config not found");
     require(reloaded_config.retries == 13, b"config retries must be 13");

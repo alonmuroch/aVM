@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(naked_functions)]
 #![feature(alloc_error_handler)]
 
 pub use types::boot::BootInfo;

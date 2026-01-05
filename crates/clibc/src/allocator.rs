@@ -1,10 +1,6 @@
 extern crate alloc;
 use alloc::alloc::{GlobalAlloc, Layout};
 
-// System call numbers for memory allocation
-const SYSCALL_ALLOC: u32 = 7;
-const SYSCALL_DEALLOC: u32 = 8;
-
 /// VM Global Allocator
 /// 
 /// This allocator uses system calls to request memory from the VM host.
@@ -73,4 +69,3 @@ unsafe fn syscall_dealloc(ptr: *mut u8, size: usize) {
         alloc::alloc::dealloc(ptr, layout);
     }
 }
-

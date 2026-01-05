@@ -70,7 +70,7 @@ fn main() {
     }
 }
 
-fn cmd_build(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
+fn cmd_build(args: Vec<String>, paths: &Paths) -> Result<(), String> {
     let mut bin: Option<String> = None;
     let mut features: Option<String> = None;
     let mut release = true;
@@ -211,7 +211,7 @@ fn cmd_build(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
     Ok(())
 }
 
-fn cmd_abi(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
+fn cmd_abi(args: Vec<String>, paths: &Paths) -> Result<(), String> {
     let mut bin: Option<String> = None;
     let mut src: Option<PathBuf> = None;
     let mut out: Option<PathBuf> = None;
@@ -284,7 +284,7 @@ fn cmd_abi(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
     Ok(())
 }
 
-fn cmd_client(mut args: Vec<String>, _paths: &Paths) -> Result<(), String> {
+fn cmd_client(args: Vec<String>, _paths: &Paths) -> Result<(), String> {
     let mut abi_path: Option<PathBuf> = None;
     let mut out: Option<PathBuf> = None;
     let mut contract: Option<String> = None;
@@ -342,7 +342,7 @@ fn cmd_client(mut args: Vec<String>, _paths: &Paths) -> Result<(), String> {
     Ok(())
 }
 
-fn cmd_all(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
+fn cmd_all(args: Vec<String>, paths: &Paths) -> Result<(), String> {
     let mut bin: Option<String> = None;
     let mut out_dir: Option<PathBuf> = None;
     let mut cargo_cmd: Option<String> = None;

@@ -1,7 +1,7 @@
 use crate::{AddressSpace, Task};
 use crate::global::{
-    CALL_ARGS_PAGE_BASE, CODE_SIZE_LIMIT, CURRENT_TASK, FROM_PTR_ADDR, HEAP_START_ADDR,
-    INPUT_BASE_ADDR, MAX_INPUT_LEN, RO_DATA_SIZE_LIMIT, TO_PTR_ADDR,
+    CALL_ARGS_PAGE_BASE, CURRENT_TASK, FROM_PTR_ADDR, HEAP_START_ADDR, INPUT_BASE_ADDR,
+    MAX_INPUT_LEN, TO_PTR_ADDR,
 };
 use crate::memory::page_allocator as mmu;
 use clibc::{log, logf};
@@ -64,23 +64,6 @@ pub fn prep_program_task(
     if entry_off as usize >= code.len() {
         panic!("launch_program: invalid entry offset");
     }
-    if code.len() >= entry_off as usize + 8 {
-        let head = u32::from_le_bytes([
-            code[entry_off as usize],
-            code[entry_off as usize + 1],
-            code[entry_off as usize + 2],
-            code[entry_off as usize + 3],
-        ]);
-        let head2 = u32::from_le_bytes([
-            code[entry_off as usize + 4],
-            code[entry_off as usize + 5],
-            code[entry_off as usize + 6],
-            code[entry_off as usize + 7],
-        ]);
-    }
-    let nz_count = code.iter().filter(|&&b| b != 0).count();
-    let local_first_nz = code.iter().position(|&b| b != 0).unwrap_or(code.len());
-
     if !mmu::copy(root_ppn, PROGRAM_VA_BASE, code) {
         logf!("launch_program: failed to copy code into root=0x%x", root_ppn);
         return None;

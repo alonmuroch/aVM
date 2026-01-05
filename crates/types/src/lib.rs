@@ -13,7 +13,6 @@ pub mod o;
 pub use o::*; // Allow `$crate::O` in macros
 
 pub mod primitives;
-pub use primitives::*; 
 
 pub mod transaction;
 pub use transaction::*;

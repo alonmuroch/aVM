@@ -12,12 +12,6 @@ k256 = { version = "0.13", default-features = false, features = ["arithmetic", "
 default = []
 binaries = []  # Enable this feature to build RISC-V binaries
 
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
-
 # Note: These binaries are designed for RISC-V target and will cause linking errors
 # when building for host architecture during tests. Use --features binaries to build them.
 [[bin]]

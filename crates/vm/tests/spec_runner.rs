@@ -235,7 +235,7 @@ fn run_category_tests(test_dir: &str, category: &str) -> Result<(usize, usize, u
     println!("Found {} {} test files to run ({} skipped)", test_files.len(), category, skipped_count);
 
     let mut passed_count = 0;
-    let mut failed_count = 0;
+    let failed_count = 0;
 
     for (i, elf_path) in test_files.iter().enumerate() {
         let test_name = std::path::Path::new(elf_path)
@@ -248,7 +248,6 @@ fn run_category_tests(test_dir: &str, category: &str) -> Result<(usize, usize, u
         
         if let Err(e) = run_single_test(elf_path) {
             println!("❌ FAILED - {}", e);
-            failed_count += 1;
             return Err(e);
         } else {
             println!("✅ PASSED");

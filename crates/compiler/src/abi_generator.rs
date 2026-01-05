@@ -241,56 +241,12 @@ impl AbiGenerator {
         functions
     }
 
-    /// Parse a selector pattern like "0x01 => function_name(call.args)" or "0x01 => { function_name(caller, call.args); }"
-    fn parse_selector_pattern<'a>(&self, line: &'a str) -> Option<(u8, &'a str)> {
-        let parts: Vec<&str> = line.split("=>").collect();
-        if parts.len() != 2 {
-            return None;
-        }
-        
-        let selector_str = parts[0].trim();
-        let function_part = parts[1].trim();
-        
-        // Extract selector
-        if !selector_str.starts_with("0x") {
-            return None;
-        }
-        
-        let selector = u8::from_str_radix(&selector_str[2..], 16).ok()?;
-        
-        // Extract function name - handle both patterns:
-        // 1. "function_name(call.args)" 
-        // 2. "{ function_name(caller, call.args); }"
-        let function_name = if function_part.starts_with('{') {
-            // Pattern 2: extract from inside braces
-            let inner = function_part.trim_start_matches('{').trim_end_matches('}');
-            // Look for function call pattern: function_name(...)
-            if let Some(start) = inner.find('(') {
-                inner[..start].trim()
-            } else {
-                return None;
-            }
-        } else {
-            // Pattern 1: extract directly
-            if let Some(start) = function_part.find('(') {
-                function_part[..start].trim()
-            } else {
-                return None;
-            }
-        };
-        
-        // Skip empty function names
-        if function_name.is_empty() {
-            return None;
-        }
-        
-        Some((selector, function_name))
-    }
-
     /// Find function definition and create FunctionAbi
     fn find_function_definition(&self, lines: &[&str], start_line: usize, function_name: &str) -> Option<FunctionAbi> {
         // Look for function definition pattern: fn function_name(...)
-        for i in 0..lines.len() {
+        let forward = start_line..lines.len();
+        let backward = 0..start_line;
+        for i in forward.chain(backward) {
             let trimmed = lines[i].trim();
             if trimmed.starts_with("fn ") && trimmed.contains(function_name) {
                 // Extract function signature
@@ -299,7 +255,7 @@ impl AbiGenerator {
                 }
             }
         }
-        
+
         None
     }
     

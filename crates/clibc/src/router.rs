@@ -1,7 +1,6 @@
 use types::result::Result;
 use types::address::Address;
 use types::{O};
-use crate::logf;
 
 /// Represents a function call with a selector (function ID) and arguments.
 /// This is the core data structure for routing function calls in our VM.
