@@ -110,10 +110,10 @@ fn kernel_bins() -> Result<Vec<String>, String> {
     for line in contents.lines() {
         let line = line.trim();
         if line == "[[bin]]" {
-            if let Some(name) = current_name.take() {
-                if name != "kernel" {
-                    bins.push(name);
-                }
+            if let Some(name) = current_name.take()
+                && name != "kernel"
+            {
+                bins.push(name);
             }
             continue;
         }
@@ -123,10 +123,10 @@ fn kernel_bins() -> Result<Vec<String>, String> {
         }
     }
 
-    if let Some(name) = current_name {
-        if name != "kernel" {
-            bins.push(name);
-        }
+    if let Some(name) = current_name
+        && name != "kernel"
+    {
+        bins.push(name);
     }
 
     if bins.is_empty() {

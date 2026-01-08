@@ -101,9 +101,12 @@ impl From<VirtualAddress> for usize {
 
 pub trait MMU: std::fmt::Debug {
     // --- CPU-facing data access (loads/stores/fetches) ---
-    fn mem(&self) -> Ref<Vec<u8>>;
-    fn mem_slice(&self, start: VirtualAddress, end: VirtualAddress)
-        -> Option<std::cell::Ref<[u8]>>;
+    fn mem(&self) -> Ref<'_, Vec<u8>>;
+    fn mem_slice(
+        &self,
+        start: VirtualAddress,
+        end: VirtualAddress,
+    ) -> Option<std::cell::Ref<'_, [u8]>>;
     fn store_u16(
         &self,
         addr: VirtualAddress,

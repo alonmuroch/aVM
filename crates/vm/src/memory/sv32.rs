@@ -280,7 +280,7 @@ impl Sv32PageTable for Sv32Memory {
 }
 
 impl MMU for Sv32Memory {
-    fn mem(&self) -> Ref<Vec<u8>> {
+    fn mem(&self) -> Ref<'_, Vec<u8>> {
         self.backing.borrow()
     }
 
@@ -288,7 +288,7 @@ impl MMU for Sv32Memory {
         &self,
         start: VirtualAddress,
         end: VirtualAddress,
-    ) -> Option<std::cell::Ref<[u8]>> {
+    ) -> Option<std::cell::Ref<'_, [u8]>> {
         if start.as_usize() > end.as_usize() {
             return None;
         }
