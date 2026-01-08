@@ -52,7 +52,13 @@ jobs:
           cargo +nightly check -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p kernel --features guest_kernel
 
       - name: ✅ Run tests
-        run: cargo test --all
+        run: |
+          CARGO_NIGHTLY="cargo +nightly" make -C crates/examples abi generate_clients
+          RUSTFLAGS="-D warnings" cargo test -p types -p storage -p state -- --nocapture
+          RUSTFLAGS="-D warnings" cargo test -p vm -- --nocapture
+          RUSTFLAGS="-D warnings" cargo test -p compiler -- --nocapture
+          (cd crates/examples && RUSTFLAGS="-D warnings" cargo test -- --nocapture)
+          RUSTFLAGS="-D warnings" cargo test -p a_tests -- --nocapture
 
       - name: 🔐 Install cargo-audit
         run: cargo install cargo-audit
