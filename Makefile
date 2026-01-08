@@ -1,5 +1,8 @@
 .PHONY: all
 
+# Treat warnings as errors for host builds.
+RUSTFLAGS ?= -D warnings
+
 # Nightly cargo for avm32 builds (used for kernel ELF and examples).
 CARGO_NIGHTLY ?= cargo +nightly-aarch64-apple-darwin
 AVM32 := $(CARGO_NIGHTLY) run -p compiler --bin avm32 --
@@ -8,11 +11,14 @@ KERNEL_OUT_DIR := crates/bootloader/bin
 KERNEL_BINS := $(shell awk '/\[\[bin\]\]/{inbin=1;next} inbin && /name =/{gsub(/"/,"",$$3); print $$3; inbin=0}' $(KERNEL_MANIFEST))
 KERNEL_TEST_BINS := $(filter-out kernel,$(KERNEL_BINS))
 
-all: clean examples test atests utils summary
+all: clean fmt_check examples test atests clippy_guest clippy_host utils summary
 
 .PHONY: run_examples
 .PHONY: kernel
 .PHONY: atests
+.PHONY: clippy_guest
+.PHONY: clippy_host
+.PHONY: fmt_check
 
 kernel:
 	@echo "=== Building kernel ELF ==="
@@ -43,14 +49,31 @@ examples:
 
 test: generate_abis
 	@echo "=== Running tests ==="
-	cargo test -p types -p storage -p state -- --nocapture
-	cargo test -p vm -- --nocapture
-	cargo test -p compiler -- --nocapture
-	cd crates/examples && cargo test -- --nocapture
+	RUSTFLAGS="$(RUSTFLAGS)" cargo test -p types -p storage -p state -- --nocapture
+	RUSTFLAGS="$(RUSTFLAGS)" cargo test -p vm -- --nocapture
+	RUSTFLAGS="$(RUSTFLAGS)" cargo test -p compiler -- --nocapture
+	cd crates/examples && RUSTFLAGS="$(RUSTFLAGS)" cargo test -- --nocapture
 	@echo "=== Tests complete ==="
 
 atests:
-	cargo test -p a_tests -- --nocapture
+	RUSTFLAGS="$(RUSTFLAGS)" cargo test -p a_tests -- --nocapture
+
+clippy_guest:
+	@echo "=== Running guest clippy (avm32 target) ==="
+	@$(CARGO_NIGHTLY) clippy -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p clibc --features guest -- -D warnings
+	@$(CARGO_NIGHTLY) clippy -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p examples --features binaries -- -D warnings
+	@$(CARGO_NIGHTLY) clippy -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p kernel --features guest_kernel -- -D warnings
+	@echo "=== Guest clippy complete ==="
+
+clippy_host:
+	@echo "=== Running host clippy ==="
+	@cargo clippy --all-targets --all-features --workspace --exclude clibc --exclude examples --exclude kernel -- -D warnings
+	@echo "=== Host clippy complete ==="
+
+fmt_check:
+	@echo "=== Checking formatting ==="
+	@cargo fmt --all -- --check
+	@echo "=== Formatting check complete ==="
 
 generate_abis:
 	@echo "=== Generating ABIs ==="
@@ -94,6 +117,9 @@ summary:
 	@echo "   - Ensures 100% match between VM and ELF when binaries available"
 	@echo "✅ Built utilities:"
 	@echo "   - binary_comparison: Tool for comparing VM logs with ELF binaries"
+	@echo "✅ Checked formatting"
+	@echo "✅ Ran host clippy"
+	@echo "✅ Ran guest clippy (avm32 target)"
 	@echo ""
 	@echo "🚀 All targets completed successfully!"
 	@echo ""

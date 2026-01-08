@@ -12,7 +12,7 @@ fn main() {
     let input_file = &args[1];
     let output_file = &args[2];
 
-    println!("Generating ABI for {}", input_file);
+    println!("Generating ABI for {input_file}");
 
     match fs::read_to_string(input_file) {
         Ok(source_code) => {
@@ -20,15 +20,15 @@ fn main() {
             let abi = generator.generate();
 
             match fs::write(output_file, abi.to_json()) {
-                Ok(_) => println!("✓ Generated ABI: {}", output_file),
+                Ok(_) => println!("✓ Generated ABI: {output_file}"),
                 Err(e) => {
-                    eprintln!("✗ Failed to write ABI: {}", e);
+                    eprintln!("✗ Failed to write ABI: {e}");
                     std::process::exit(1);
                 }
             }
         }
         Err(e) => {
-            eprintln!("✗ Failed to read input file: {}", e);
+            eprintln!("✗ Failed to read input file: {e}");
             std::process::exit(1);
         }
     }

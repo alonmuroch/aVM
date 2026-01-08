@@ -173,7 +173,7 @@ impl State {
     pub fn is_contract(&self, _addr: Address) -> bool {
         // EDUCATIONAL: In a real implementation, this would check if the account has code
         // self.accounts.get(addr).map_or(false, |acc| acc.code.is_some())
-        return true;
+        true
     }
 
     /// Encode state into a byte buffer for guest consumption.
@@ -198,7 +198,7 @@ impl State {
             acc_len = acc_len.saturating_add(4); // storage len
             for (k, v) in &acc.storage {
                 acc_len = acc_len.saturating_add(4); // key len
-                acc_len = acc_len.saturating_add(k.as_bytes().len());
+                acc_len = acc_len.saturating_add(k.len());
                 acc_len = acc_len.saturating_add(4); // val len
                 acc_len = acc_len.saturating_add(v.len());
             }
@@ -234,7 +234,7 @@ impl State {
             let storage_len = acc.storage.len() as u32;
             write(out, &mut cursor, &storage_len.to_le_bytes())?;
             for (k, v) in &acc.storage {
-                let key_len = k.as_bytes().len() as u32;
+                let key_len = k.len() as u32;
                 write(out, &mut cursor, &key_len.to_le_bytes())?;
                 write(out, &mut cursor, k.as_bytes())?;
                 let val_len = v.len() as u32;
@@ -331,5 +331,11 @@ impl State {
         }
 
         Some(Self { accounts })
+    }
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
     }
 }

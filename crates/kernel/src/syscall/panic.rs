@@ -65,5 +65,7 @@ pub(crate) fn sys_panic(args: [u32; 6]) -> u32 {
 #[inline(never)]
 fn halt() -> ! {
     unsafe { core::arch::asm!("ebreak") };
-    loop {}
+    loop {
+        core::hint::spin_loop();
+    }
 }

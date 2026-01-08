@@ -52,7 +52,7 @@ impl ParamType {
     pub fn to_json_string(&self) -> String {
         match self {
             ParamType::Address => "address".to_string(),
-            ParamType::Uint(bits) => format!("uint{}", bits),
+            ParamType::Uint(bits) => format!("uint{bits}"),
             ParamType::Bool => "bool".to_string(),
             ParamType::Bytes => "bytes".to_string(),
             ParamType::String => "string".to_string(),
@@ -482,7 +482,7 @@ impl ContractAbi {
     }
 
     fn extract_string_value(json: &str, key: &str) -> Option<String> {
-        let search_key = format!("\"{}\"", key);
+        let search_key = format!("\"{key}\"");
         if let Some(key_pos) = json.find(&search_key) {
             let after_key = &json[key_pos + search_key.len()..];
             if let Some(colon) = after_key.find(':') {
@@ -498,7 +498,7 @@ impl ContractAbi {
     }
 
     fn extract_number_value(json: &str, key: &str) -> Option<i64> {
-        let search_key = format!("\"{}\"", key);
+        let search_key = format!("\"{key}\"");
         if let Some(key_pos) = json.find(&search_key) {
             let after_key = &json[key_pos + search_key.len()..];
             if let Some(colon) = after_key.find(':') {
@@ -520,7 +520,7 @@ impl ContractAbi {
     }
 
     fn extract_bool_value(json: &str, key: &str) -> Option<bool> {
-        let search_key = format!("\"{}\"", key);
+        let search_key = format!("\"{key}\"");
         if let Some(key_pos) = json.find(&search_key) {
             let after_key = &json[key_pos + search_key.len()..];
             if let Some(colon) = after_key.find(':') {
@@ -533,5 +533,11 @@ impl ContractAbi {
             }
         }
         None
+    }
+}
+
+impl Default for ContractAbi {
+    fn default() -> Self {
+        Self::new()
     }
 }

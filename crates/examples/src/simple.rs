@@ -37,7 +37,7 @@ use clibc::{DataParser, entrypoint, require, types::result::Result};
 /// - Input validation prevents buffer overflows
 /// - No external calls or state modifications
 /// - Deterministic execution for all inputs
-fn my_vm_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
+fn program_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
     let _ = program;
     // EDUCATIONAL: Validate input data length to prevent buffer overflows
     // This is a critical security practice in smart contracts
@@ -53,13 +53,13 @@ fn my_vm_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
     // This demonstrates conditional logic in smart contracts
     if first > second {
         // Return success with the larger number (first) stored in data
-        return Result::with_u32(first);
+        Result::with_u32(first)
     } else {
         // Return success with the larger number (second) stored in data
-        return Result::with_u32(second);
-    };
+        Result::with_u32(second)
+    }
 }
 
 // EDUCATIONAL: Register the function as the entrypoint
 // This macro tells the VM which function to call when the contract is invoked
-entrypoint!(my_vm_entry);
+entrypoint!(program_entry);

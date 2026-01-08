@@ -20,8 +20,10 @@ const KERNEL_TASK_IDX: usize = 0;
 /// - `bundle_ptr`/`bundle_len`: encoded `TransactionBundle` prepared by the bootloader.
 /// - `state_ptr`/`state_len`: optional state blob (currently unused).
 /// - `boot_info_ptr`: bootloader handoff with stack + page-table root info.
+/// # Safety
+/// The pointers must be valid for the provided lengths.
 #[unsafe(no_mangle)]
-pub extern "C" fn _start(
+pub unsafe extern "C" fn _start(
     bundle_ptr: *const u8,
     bundle_len: usize,
     state_ptr: *const u8,
@@ -46,5 +48,7 @@ pub extern "C" fn _start(
 #[inline(never)]
 fn halt() -> ! {
     unsafe { core::arch::asm!("ebreak") };
-    loop {}
+    loop {
+        core::hint::spin_loop();
+    }
 }

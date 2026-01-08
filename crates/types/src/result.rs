@@ -98,6 +98,11 @@ impl Result {
     }
 
     #[cfg(not(target_arch = "riscv32"))]
+    /// # Safety
+    ///
+    /// This function is unsafe because it mirrors a raw-pointer API. The
+    /// pointer value is ignored on non-riscv32 targets, but callers must still
+    /// uphold the same safety guarantees as the riscv32 implementation.
     pub unsafe fn from_ptr(_result_ptr: u32) -> Option<Self> {
         panic!("not implemented")
     }

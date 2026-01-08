@@ -65,7 +65,7 @@ fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("✗ {}", e);
+        eprintln!("✗ {e}");
         std::process::exit(1);
     }
 }
@@ -117,7 +117,7 @@ fn cmd_build(args: Vec<String>, paths: &Paths) -> Result<(), String> {
                     .ok_or("missing value for --linker-script")?;
                 linker_script = Some(PathBuf::from(val));
             }
-            other => return Err(format!("unknown flag {}", other)),
+            other => return Err(format!("unknown flag {other}")),
         }
         i += 1;
     }
@@ -150,7 +150,7 @@ fn cmd_build(args: Vec<String>, paths: &Paths) -> Result<(), String> {
     if !linker.exists() {
         return Err(format!("linker script {} does not exist", linker.display()));
     }
-    rustflags.push_str(&linker.to_str().ok_or("invalid linker script path")?);
+    rustflags.push_str(linker.to_str().ok_or("invalid linker script path")?);
 
     // Split cargo command to support "+nightly" prefixes
     let mut parts = cargo.split_whitespace();
@@ -175,7 +175,7 @@ fn cmd_build(args: Vec<String>, paths: &Paths) -> Result<(), String> {
         .args(&cargo_args)
         .env("RUSTFLAGS", rustflags)
         .status()
-        .map_err(|e| format!("failed to run cargo: {}", e))?;
+        .map_err(|e| format!("failed to run cargo: {e}"))?;
 
     if !status.success() {
         return Err(format!(
@@ -194,7 +194,7 @@ fn cmd_build(args: Vec<String>, paths: &Paths) -> Result<(), String> {
         return Err(format!("expected built artifact at {}", built.display()));
     }
 
-    let dest = out_dir.join(format!("{}.elf", bin));
+    let dest = out_dir.join(format!("{bin}.elf"));
     fs::copy(&built, &dest).map_err(|e| {
         format!(
             "failed to copy {} to {}: {}",
@@ -239,7 +239,7 @@ fn cmd_abi(args: Vec<String>, paths: &Paths) -> Result<(), String> {
                     .ok_or("missing value for --manifest-path")?;
                 manifest_path = Some(PathBuf::from(val));
             }
-            other => return Err(format!("unknown flag {}", other)),
+            other => return Err(format!("unknown flag {other}")),
         }
         i += 1;
     }
@@ -261,14 +261,14 @@ fn cmd_abi(args: Vec<String>, paths: &Paths) -> Result<(), String> {
         (name, s)
     } else {
         let name = bin.ok_or("missing --bin <name> or --src <path>")?;
-        let inferred = manifest_dir.join("src").join(format!("{}.rs", name));
+        let inferred = manifest_dir.join("src").join(format!("{name}.rs"));
         (name, inferred)
     };
 
     let output = out.unwrap_or_else(|| {
         manifest_dir
             .join("bin")
-            .join(format!("{}.abi.json", bin_name))
+            .join(format!("{bin_name}.abi.json"))
     });
     let source = fs::read_to_string(&src_path)
         .map_err(|e| format!("failed to read {}: {}", src_path.display(), e))?;
@@ -306,7 +306,7 @@ fn cmd_client(args: Vec<String>, _paths: &Paths) -> Result<(), String> {
                 i += 1;
                 contract = Some(args.get(i).cloned().ok_or("missing value for --contract")?);
             }
-            other => return Err(format!("unknown flag {}", other)),
+            other => return Err(format!("unknown flag {other}")),
         }
         i += 1;
     }
@@ -329,7 +329,7 @@ fn cmd_client(args: Vec<String>, _paths: &Paths) -> Result<(), String> {
         abi_path.to_str().ok_or("invalid abi path")?,
         contract_name,
     )
-    .map_err(|e| format!("failed to generate client: {}", e))?;
+    .map_err(|e| format!("failed to generate client: {e}"))?;
 
     fs::create_dir_all(out.parent().ok_or("invalid output path for client")?)
         .map_err(|e| e.to_string())?;
@@ -389,7 +389,7 @@ fn cmd_all(args: Vec<String>, paths: &Paths) -> Result<(), String> {
                     .ok_or("missing value for --linker-script")?;
                 linker_script = Some(PathBuf::from(val));
             }
-            other => return Err(format!("unknown flag {}", other)),
+            other => return Err(format!("unknown flag {other}")),
         }
         i += 1;
     }
@@ -401,9 +401,9 @@ fn cmd_all(args: Vec<String>, paths: &Paths) -> Result<(), String> {
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| paths.repo_root.clone());
     let out_dir = out_dir.unwrap_or_else(|| manifest_dir.join("bin"));
-    let abi_out = out_dir.join(format!("{}.abi.json", bin));
-    let client_out = out_dir.join(format!("{}_abi.rs", bin));
-    let src = src_override.unwrap_or_else(|| manifest_dir.join("src").join(format!("{}.rs", bin)));
+    let abi_out = out_dir.join(format!("{bin}.abi.json"));
+    let client_out = out_dir.join(format!("{bin}_abi.rs"));
+    let src = src_override.unwrap_or_else(|| manifest_dir.join("src").join(format!("{bin}.rs")));
 
     cmd_build(
         vec![

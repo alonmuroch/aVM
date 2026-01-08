@@ -55,7 +55,7 @@ impl Sv32Memory {
         assert!(page_size != 0, "page_size must be > 0");
         assert!(total_size_bytes != 0, "total_size_bytes must be > 0");
 
-        let total_pages = (total_size_bytes + (page_size - 1)) / page_size;
+        let total_pages = total_size_bytes.div_ceil(page_size);
         let total = total_pages
             .checked_mul(page_size)
             .expect("physical memory size overflow");

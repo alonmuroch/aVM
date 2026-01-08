@@ -47,7 +47,7 @@ fn should_skip_test(file_name: &str) -> Option<&str> {
 /// Run a single test file
 fn run_single_test(elf_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     if !Path::new(elf_path).exists() {
-        println!("ELF file not found at {}, skipping...", elf_path);
+        println!("ELF file not found at {elf_path}, skipping...");
         return Ok(());
     }
 
@@ -178,7 +178,7 @@ fn run_single_test(elf_path: &str) -> Result<(), Box<dyn std::error::Error>> {
                 println!("Test completed.");
                 return Ok(());
             }
-            return Err(format!("test failed (tohost=0x{:x})", tohost_value).into());
+            return Err(format!("test failed (tohost=0x{tohost_value:x})").into());
         }
     }
 
@@ -189,7 +189,7 @@ fn run_single_test(elf_path: &str) -> Result<(), Box<dyn std::error::Error>> {
             println!("Test completed.");
             return Ok(());
         }
-        return Err(format!("test failed (ecall exit code={})", exit_code).into());
+        return Err(format!("test failed (ecall exit code={exit_code})").into());
     }
 
     Err("execution halted without tohost signal".into())
@@ -215,36 +215,34 @@ fn collect_test_files(test_dir: &str, category: &str) -> (Vec<String>, usize) {
     let mut test_files = Vec::new();
     let mut skipped_count = 0;
 
-    println!("Looking for files in: {}", test_dir);
-    println!("Category prefix: rv32{}p-", category);
+    println!("Looking for files in: {test_dir}");
+    println!("Category prefix: rv32{category}p-");
 
     if let Ok(entries) = std::fs::read_dir(test_dir) {
-        for entry in entries {
-            if let Ok(entry) = entry {
-                let path = entry.path();
-                if let Some(file_name) = path.file_name() {
-                    if let Some(name_str) = file_name.to_str() {
-                        // Include files that start with the category prefix and are not .dump files
-                        let category_prefix = format!("rv32{}-p-", category);
-                        if name_str.starts_with(&category_prefix)
-                            && !path.is_dir()
-                            && !name_str.ends_with(".dump")
-                        {
-                            // Check if this test should be skipped
-                            if let Some(reason) = should_skip_test(name_str) {
-                                println!("Skipping {}: {}", name_str, reason);
-                                skipped_count += 1;
-                                continue;
-                            }
-
-                            test_files.push(path.to_string_lossy().to_string());
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(file_name) = path.file_name() {
+                if let Some(name_str) = file_name.to_str() {
+                    // Include files that start with the category prefix and are not .dump files
+                    let category_prefix = format!("rv32{category}-p-");
+                    if name_str.starts_with(&category_prefix)
+                        && !path.is_dir()
+                        && !name_str.ends_with(".dump")
+                    {
+                        // Check if this test should be skipped
+                        if let Some(reason) = should_skip_test(name_str) {
+                            println!("Skipping {name_str}: {reason}");
+                            skipped_count += 1;
+                            continue;
                         }
+
+                        test_files.push(path.to_string_lossy().to_string());
                     }
                 }
             }
         }
     } else {
-        println!("Failed to read directory: {}", test_dir);
+        println!("Failed to read directory: {test_dir}");
     }
 
     test_files.sort(); // Sort for consistent ordering
@@ -282,7 +280,7 @@ fn run_category_tests(
         print!("[{:2}/{:2}] {}: ", i + 1, test_files.len(), test_name);
 
         if let Err(e) = run_single_test(elf_path) {
-            println!("❌ FAILED - {}", e);
+            println!("❌ FAILED - {e}");
             return Err(e);
         } else {
             println!("✅ PASSED");
@@ -304,11 +302,11 @@ fn test_riscv_spec() {
 
     // Print current working directory for debugging
     println!("Current dir: {:?}", std::env::current_dir().unwrap());
-    println!("Looking for tests in: {}", test_dir);
+    println!("Looking for tests in: {test_dir}");
 
     // Check if the test directory exists
     if !Path::new(test_dir).exists() {
-        println!("Test directory not found at {}, skipping test", test_dir);
+        println!("Test directory not found at {test_dir}, skipping test");
         return;
     }
 
@@ -330,7 +328,7 @@ fn test_riscv_spec() {
                 category_results.push((category.to_string(), passed, failed, skipped));
             }
             Err(e) => {
-                println!("❌ Failed to run {} category tests: {}", category, e);
+                println!("❌ Failed to run {category} category tests: {e}");
                 panic!("Test suite failed");
             }
         }
@@ -369,11 +367,11 @@ fn test_riscv_spec() {
     };
 
     println!("\n📈 Overall Statistics:");
-    println!("  Total Tests: {}", total_tests);
-    println!("  Passed: {} ✅", total_passed);
-    println!("  Failed: {} ❌", total_failed);
-    println!("  Skipped: {} ⏭️", total_skipped);
-    println!("  Success Rate: {:.1}%", overall_success_rate);
+    println!("  Total Tests: {total_tests}");
+    println!("  Passed: {total_passed} ✅");
+    println!("  Failed: {total_failed} ❌");
+    println!("  Skipped: {total_skipped} ⏭️");
+    println!("  Success Rate: {overall_success_rate:.1}%");
 
     // Test coverage information
     println!("\n🎯 Test Coverage:");
@@ -386,14 +384,14 @@ fn test_riscv_spec() {
     if total_skipped > 0 {
         println!("\n⏭️ Skipped Tests:");
         for (test_name, reason) in SKIPPED_TESTS {
-            println!("  - {}: {}", test_name, reason);
+            println!("  - {test_name}: {reason}");
         }
     }
 
     println!("\n{}", "=".repeat(60));
 
     if total_failed > 0 {
-        panic!("Test suite completed with {} failures", total_failed);
+        panic!("Test suite completed with {total_failed} failures");
     } else {
         println!("🎉 All tests passed successfully!");
     }

@@ -2,7 +2,6 @@ use types::address::Address;
 use types::result::Result;
 
 pub fn call(from: &Address, to: &Address, input_data: &[u8]) -> Option<Result> {
-    #[cfg(target_arch = "riscv32")]
     unsafe {
         let mut result_ptr: u32;
         core::arch::asm!(
@@ -20,11 +19,5 @@ pub fn call(from: &Address, to: &Address, input_data: &[u8]) -> Option<Result> {
         }
 
         Result::from_ptr(result_ptr)
-    }
-
-    #[cfg(not(target_arch = "riscv32"))]
-    {
-        // For non-RISC-V targets, return None
-        None
     }
 }

@@ -9,6 +9,9 @@ use clibc::log;
 use kernel::BootInfo;
 use kernel::memory::page_allocator::{self, PagePerms};
 
+const PAGE_SIZE: usize = 0x1000;
+const L1_SPAN: u32 = 1 << 22;
+
 #[path = "../../tests/fail.rs"]
 mod fail;
 #[path = "../../tests/results.rs"]
@@ -16,11 +19,14 @@ mod results;
 #[path = "../../tests/utils.rs"]
 mod utils;
 
-const PAGE_SIZE: usize = 0x1000;
-const L1_SPAN: u32 = 1 << 22;
-
+/// # Safety
+/// The pointers must be valid for the provided lengths.
 #[unsafe(no_mangle)]
-pub extern "C" fn _start(input_ptr: *const u8, input_len: usize, boot_info_ptr: *const BootInfo) {
+pub unsafe extern "C" fn _start(
+    input_ptr: *const u8,
+    input_len: usize,
+    boot_info_ptr: *const BootInfo,
+) {
     log!("kernel mem map edge test boot");
     let info = utils::init_test_kernel(boot_info_ptr);
 
@@ -227,7 +233,7 @@ fn test_map_to_physical_alignment_and_alias(user_root: u32, info: BootInfo) -> R
         return Err(40);
     }
     let source_phys = page_allocator::translate(user_root, source_va).unwrap_or(0);
-    if source_phys == 0 || source_phys % PAGE_SIZE != 0 {
+    if source_phys == 0 || !source_phys.is_multiple_of(PAGE_SIZE) {
         return Err(41);
     }
 
@@ -360,7 +366,7 @@ fn test_copy_user_atomic(user_root: u32, info: BootInfo) -> Result<(), u32> {
     log!("subtest: attempt a cross-page write and confirm no bytes changed");
     let mut big = [0u8; 16];
     for (i, byte) in big.iter_mut().enumerate() {
-        *byte = (0x80 + i as u8) as u8;
+        *byte = 0x80 + i as u8;
     }
     let cross_start = boundary_start;
     if page_allocator::copy_user(user_root, cross_start, &big) {

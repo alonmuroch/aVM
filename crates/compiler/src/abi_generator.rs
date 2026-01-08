@@ -57,8 +57,8 @@ impl AbiGenerator {
         let mut in_event = false;
         let mut consumed_lines = 0;
 
-        for i in start_line..lines.len() {
-            let line = lines[i].trim();
+        for line in lines.iter().skip(start_line) {
+            let line = line.trim();
             consumed_lines += 1;
 
             if !in_event {
@@ -279,8 +279,8 @@ impl AbiGenerator {
     pub fn extract_function_signature(&self, lines: &[&str], start_line: usize) -> Option<String> {
         let mut signature = String::new();
 
-        for i in start_line..lines.len() {
-            let line = lines[i].trim();
+        for line in lines.iter().skip(start_line) {
+            let line = line.trim();
 
             if line.starts_with("fn ") {
                 // Start collecting the signature
@@ -494,18 +494,18 @@ pub fn generate_all_example_abis() -> std::io::Result<()> {
     ];
 
     for source_file in source_files {
-        let source_path = format!("{}/{}", examples_dir, source_file);
-        let abi_path = format!("{}/{}.abi.json", bin_dir, source_file.replace(".rs", ""));
+        let source_path = format!("{examples_dir}/{source_file}");
+        let abi_path = format!("{bin_dir}/{}.abi.json", source_file.replace(".rs", ""));
 
-        println!("Generating ABI for {}", source_file);
+        println!("Generating ABI for {source_file}");
 
         match AbiGenerator::from_file(&source_path) {
             Ok(abi) => {
                 AbiGenerator::write_abi_to_file(&abi, &abi_path)?;
-                println!("  ✓ Generated {}", abi_path);
+                println!("  ✓ Generated {abi_path}");
             }
             Err(e) => {
-                eprintln!("  ✗ Failed to generate ABI for {}: {}", source_file, e);
+                eprintln!("  ✗ Failed to generate ABI for {source_file}: {e}");
             }
         }
     }

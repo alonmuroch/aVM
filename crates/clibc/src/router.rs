@@ -202,8 +202,8 @@ pub fn route<'a>(
     // Phase 2: Execute calls
     let mut last_result = Result::new(true, 0);
 
-    for i in 0..count {
-        if let O::Some(call) = &buf[i] {
+    for call in buf.iter().take(count) {
+        if let O::Some(call) = call {
             last_result = handler(to, from, call);
         }
     }

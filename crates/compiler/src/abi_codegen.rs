@@ -61,7 +61,7 @@ impl AbiCodeGenerator {
             // Generate methods for each function
             for function in &self.abi.functions {
                 code.push_str(&self.generate_function_method(function));
-                code.push_str("\n");
+                code.push('\n');
             }
         }
 
@@ -155,108 +155,78 @@ impl AbiCodeGenerator {
         match input.kind {
             ParamType::Address => {
                 format!(
-                    "        if {offset} + 20 > {buf}.len() {{ return None; }}\n\
-         {buf}[{offset}..{offset} + 20].copy_from_slice(&{name}.0);\n\
-         {offset} += 20;\n",
-                    buf = buffer,
-                    offset = offset_var,
-                    name = name,
+                    "        if {offset_var} + 20 > {buffer}.len() {{ return None; }}\n\
+         {buffer}[{offset_var}..{offset_var} + 20].copy_from_slice(&{name}.0);\n\
+         {offset_var} += 20;\n",
                 )
             }
             ParamType::Uint(8) => {
                 format!(
-                    "        if {offset} >= {buf}.len() {{ return None; }}\n\
-         {buf}[{offset}] = {name};\n\
-         {offset} += 1;\n",
-                    buf = buffer,
-                    offset = offset_var,
-                    name = name,
+                    "        if {offset_var} >= {buffer}.len() {{ return None; }}\n\
+         {buffer}[{offset_var}] = {name};\n\
+         {offset_var} += 1;\n",
                 )
             }
             ParamType::Uint(16) => {
                 format!(
-                    "        if {offset} + 2 > {buf}.len() {{ return None; }}\n\
-         {buf}[{offset}..{offset} + 2].copy_from_slice(&{name}.to_le_bytes());\n\
-         {offset} += 2;\n",
-                    buf = buffer,
-                    offset = offset_var,
-                    name = name,
+                    "        if {offset_var} + 2 > {buffer}.len() {{ return None; }}\n\
+         {buffer}[{offset_var}..{offset_var} + 2].copy_from_slice(&{name}.to_le_bytes());\n\
+         {offset_var} += 2;\n",
                 )
             }
             ParamType::Uint(32) => {
                 format!(
-                    "        if {offset} + 4 > {buf}.len() {{ return None; }}\n\
-         {buf}[{offset}..{offset} + 4].copy_from_slice(&{name}.to_le_bytes());\n\
-         {offset} += 4;\n",
-                    buf = buffer,
-                    offset = offset_var,
-                    name = name,
+                    "        if {offset_var} + 4 > {buffer}.len() {{ return None; }}\n\
+         {buffer}[{offset_var}..{offset_var} + 4].copy_from_slice(&{name}.to_le_bytes());\n\
+         {offset_var} += 4;\n",
                 )
             }
             ParamType::Uint(64) => {
                 format!(
-                    "        if {offset} + 8 > {buf}.len() {{ return None; }}\n\
-         {buf}[{offset}..{offset} + 8].copy_from_slice(&{name}.to_le_bytes());\n\
-         {offset} += 8;\n",
-                    buf = buffer,
-                    offset = offset_var,
-                    name = name,
+                    "        if {offset_var} + 8 > {buffer}.len() {{ return None; }}\n\
+         {buffer}[{offset_var}..{offset_var} + 8].copy_from_slice(&{name}.to_le_bytes());\n\
+         {offset_var} += 8;\n",
                 )
             }
             ParamType::Uint(128) => {
                 format!(
-                    "        if {offset} + 16 > {buf}.len() {{ return None; }}\n\
-         {buf}[{offset}..{offset} + 16].copy_from_slice(&{name}.to_le_bytes());\n\
-         {offset} += 16;\n",
-                    buf = buffer,
-                    offset = offset_var,
-                    name = name,
+                    "        if {offset_var} + 16 > {buffer}.len() {{ return None; }}\n\
+         {buffer}[{offset_var}..{offset_var} + 16].copy_from_slice(&{name}.to_le_bytes());\n\
+         {offset_var} += 16;\n",
                 )
             }
             ParamType::Uint(256) => {
                 format!(
-                    "        if {offset} + 32 > {buf}.len() {{ return None; }}\n\
-         {buf}[{offset}..{offset} + 32].copy_from_slice(&{name});\n\
-         {offset} += 32;\n",
-                    buf = buffer,
-                    offset = offset_var,
-                    name = name,
+                    "        if {offset_var} + 32 > {buffer}.len() {{ return None; }}\n\
+         {buffer}[{offset_var}..{offset_var} + 32].copy_from_slice(&{name});\n\
+         {offset_var} += 32;\n",
                 )
             }
             ParamType::Bool => {
                 format!(
-                    "        if {offset} >= {buf}.len() {{ return None; }}\n\
-         {buf}[{offset}] = if {name} {{ 1 }} else {{ 0 }};\n\
-         {offset} += 1;\n",
-                    buf = buffer,
-                    offset = offset_var,
-                    name = name,
+                    "        if {offset_var} >= {buffer}.len() {{ return None; }}\n\
+         {buffer}[{offset_var}] = if {name} {{ 1 }} else {{ 0 }};\n\
+         {offset_var} += 1;\n",
                 )
             }
             ParamType::String => {
                 format!(
                     "        let arg_{name} = {name}.as_bytes();\n\
-         if {offset} + arg_{name}.len() > {buf}.len() {{ return None; }}\n\
-         {buf}[{offset}..{offset} + arg_{name}.len()].copy_from_slice(arg_{name});\n\
-         {offset} += arg_{name}.len();\n",
-                    buf = buffer,
-                    offset = offset_var,
-                    name = name,
+         if {offset_var} + arg_{name}.len() > {buffer}.len() {{ return None; }}\n\
+         {buffer}[{offset_var}..{offset_var} + arg_{name}.len()].copy_from_slice(arg_{name});\n\
+         {offset_var} += arg_{name}.len();\n",
                 )
             }
             ParamType::Bytes => {
                 format!(
                     "        let arg_{name} = {name};\n\
-         if {offset} + arg_{name}.len() > {buf}.len() {{ return None; }}\n\
-         {buf}[{offset}..{offset} + arg_{name}.len()].copy_from_slice(arg_{name});\n\
-         {offset} += arg_{name}.len();\n",
-                    buf = buffer,
-                    offset = offset_var,
-                    name = name,
+         if {offset_var} + arg_{name}.len() > {buffer}.len() {{ return None; }}\n\
+         {buffer}[{offset_var}..{offset_var} + arg_{name}.len()].copy_from_slice(arg_{name});\n\
+         {offset_var} += arg_{name}.len();\n",
                 )
             }
             _ => {
-                format!("        // TODO: encode argument `{}`\n", name)
+                format!("        // TODO: encode argument `{name}`\n")
             }
         }
     }
@@ -295,22 +265,21 @@ pub fn generate_all_client_code() -> std::io::Result<()> {
     ];
 
     for (abi_file, contract_name) in abi_files {
-        let abi_path = format!("{}/{}", bin_dir, abi_file);
+        let abi_path = format!("{bin_dir}/{abi_file}");
         let output_path = format!(
-            "{}/{}.rs",
-            generated_dir,
+            "{generated_dir}/{}.rs",
             abi_file.replace(".abi.json", "_client")
         );
 
-        println!("Generating client code for {}", abi_file);
+        println!("Generating client code for {abi_file}");
 
         match AbiCodeGenerator::from_abi_file(&abi_path, contract_name.to_string()) {
             Ok(code) => {
                 AbiCodeGenerator::write_to_file(&code, &output_path)?;
-                println!("  ✓ Generated {}", output_path);
+                println!("  ✓ Generated {output_path}");
             }
             Err(e) => {
-                eprintln!("  ✗ Failed to generate client code for {}: {}", abi_file, e);
+                eprintln!("  ✗ Failed to generate client code for {abi_file}: {e}");
             }
         }
     }

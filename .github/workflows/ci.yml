@@ -26,7 +26,20 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: 🔍 Run Clippy (linter)
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace --exclude clibc --exclude examples --exclude kernel -- -D warnings
+
+      - name: 🧰 Set up nightly for guest target
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: false
+          components: clippy, rust-src
+
+      - name: 🔍 Run Clippy (guest target)
+        run: |
+          cargo +nightly clippy -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p clibc --features guest -- -D warnings
+          cargo +nightly clippy -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p examples --features binaries -- -D warnings
+          cargo +nightly clippy -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p kernel --features guest_kernel -- -D warnings
 
       - name: 🧪 Run cargo check
         run: cargo check --all --all-targets

@@ -38,7 +38,6 @@ dependencies = [
 name = "bootloader"
 version = "0.1.0"
 dependencies = [
- "clibc",
  "compiler",
  "goblin 0.10.0",
  "state",

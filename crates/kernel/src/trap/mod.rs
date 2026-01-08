@@ -50,7 +50,7 @@ pub fn init_trap_vector(kstack_top: u32) {
     logf!("init_trap_vector: kstack_top=0x%x", kstack_top);
     unsafe {
         asm!("csrw sscratch, {0}", in(reg) kstack_top);
-        asm!("csrw stvec, {0}", in(reg) trap_entry as usize);
+        asm!("csrw stvec, {0}", in(reg) trap_entry as *const () as usize);
     }
 }
 
@@ -60,6 +60,9 @@ pub fn init_trap_vector(kstack_top: u32) {
 /// - Call into the Rust trap handler with a pointer to the saved area.
 /// - Restore registers and return via the shared trampoline.
 // #[unsafe(naked)]
+/// # Safety
+/// This function is entered directly from assembly and assumes the trap frame
+/// layout and stack switching protocol are correctly set up.
 pub unsafe extern "C" fn trap_entry() -> ! {
     unsafe {
         core::arch::asm!(
@@ -115,8 +118,10 @@ unsafe extern "C" fn return_from_trap() -> ! {
 /// Rust-level trap handler. Receives a pointer to the saved register block
 /// laid out as:
 /// regs[0..32] = x0..x31, regs[32] = pc.
+/// # Safety
+/// `saved` must point to a valid trap frame with `TRAP_FRAME_WORDS` entries.
 #[unsafe(no_mangle)]
-pub extern "C" fn handle_trap(saved: *mut u32) -> TrapReturn {
+pub unsafe extern "C" fn handle_trap(saved: *mut u32) -> TrapReturn {
     let regs = unsafe { core::slice::from_raw_parts_mut(saved, TRAP_FRAME_WORDS) };
     let scause = read_scause();
     let stval = read_stval();
@@ -170,26 +175,26 @@ pub extern "C" fn handle_trap(saved: *mut u32) -> TrapReturn {
                 let current = *CURRENT_TASK.get_mut();
                 let tasks = TASKS.get_mut();
                 // If this is a user task, save its current trapframe so it can be resumed later.
-                if current != KERNEL_TASK_SLOT {
-                    if let Some(task) = tasks.get_mut(current) {
-                        if let Some(result) = read_task_result(task) {
-                            task.last_result = Some(result);
-                            log_task_result(&result);
-                            result_for_caller = Some(result);
-                        } else {
-                            log!("program result: failed to read result bytes");
-                        }
-                        for (idx, value) in regs.iter().take(REG_COUNT).enumerate() {
-                            task.tf.regs[idx] = *value;
-                        }
-                        task.tf.pc = regs[REG_PC];
-                        // Use the recorded caller task as the return target.
-                        caller_idx = task.caller_task_id.unwrap_or(KERNEL_TASK_SLOT);
-                        if caller_idx == KERNEL_TASK_SLOT {
-                            // Only record tasks that return to the kernel so bundle resume can
-                            // associate the completed task with the current transaction receipt.
-                            *LAST_COMPLETED_TASK.get_mut() = Some(current);
-                        }
+                if current != KERNEL_TASK_SLOT
+                    && let Some(task) = tasks.get_mut(current)
+                {
+                    if let Some(result) = read_task_result(task) {
+                        task.last_result = Some(result);
+                        log_task_result(&result);
+                        result_for_caller = Some(result);
+                    } else {
+                        log!("program result: failed to read result bytes");
+                    }
+                    for (idx, value) in regs.iter().take(REG_COUNT).enumerate() {
+                        task.tf.regs[idx] = *value;
+                    }
+                    task.tf.pc = regs[REG_PC];
+                    // Use the recorded caller task as the return target.
+                    caller_idx = task.caller_task_id.unwrap_or(KERNEL_TASK_SLOT);
+                    if caller_idx == KERNEL_TASK_SLOT {
+                        // Only record tasks that return to the kernel so bundle resume can
+                        // associate the completed task with the current transaction receipt.
+                        *LAST_COMPLETED_TASK.get_mut() = Some(current);
                     }
                 }
                 // Restore the caller task's trapframe and address-space root.

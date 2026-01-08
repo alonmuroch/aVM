@@ -196,6 +196,10 @@ impl<'a> BufferWriter<'a> {
     pub fn len(&self) -> usize {
         self.position
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.position == 0
+    }
 }
 
 impl<'a> core::fmt::Write for BufferWriter<'a> {

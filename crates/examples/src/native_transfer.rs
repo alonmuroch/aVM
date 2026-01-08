@@ -11,7 +11,7 @@ use clibc::{DataParser, entrypoint, require};
 /// address using the VM's transfer syscall. The input payload is:
 /// - 20 bytes: destination address
 /// - 8 bytes: amount (little-endian u64)
-fn transfer_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
+fn program_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
     let _ = program;
     let mut parser = DataParser::new(data);
     // Need at least 20 bytes for the address and 8 bytes for the value
@@ -33,4 +33,4 @@ fn transfer_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
     result
 }
 
-entrypoint!(transfer_entry);
+entrypoint!(program_entry);

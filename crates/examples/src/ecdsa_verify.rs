@@ -14,7 +14,7 @@ use k256::ecdsa::{Signature, VerifyingKey, signature::hazmat::PrehashVerifier};
 /// - N bytes: SEC1-encoded pubkey
 /// - 64 bytes: signature (r||s)
 /// - 32 bytes: message hash (already hashed)
-fn my_vm_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
+fn program_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
     let _ = program;
     let mut parser = DataParser::new(data);
 
@@ -48,4 +48,4 @@ fn my_vm_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
     Result::new(true, 0)
 }
 
-entrypoint!(my_vm_entry);
+entrypoint!(program_entry);

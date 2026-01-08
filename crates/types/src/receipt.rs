@@ -181,12 +181,12 @@ impl fmt::Display for TransactionReceipt {
         writeln!(f, "Events:")?;
 
         for (i, event) in self.events.iter().enumerate() {
-            write!(f, "  [{}] ", i)?;
+            write!(f, "  [{i}] ")?;
             for (j, byte) in event.iter().enumerate() {
                 if j > 0 {
                     write!(f, " ")?;
                 }
-                write!(f, "{:02x}", byte)?;
+                write!(f, "{byte:02x}")?;
             }
             writeln!(f)?;
         }

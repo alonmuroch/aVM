@@ -675,10 +675,8 @@ impl CPU {
                         if !self.write_reg(rd, lhs) {
                             return false;
                         } // Return dividend on overflow
-                    } else {
-                        if !self.write_reg(rd, (dividend / divisor) as u32) {
-                            return false;
-                        }
+                    } else if !self.write_reg(rd, (dividend / divisor) as u32) {
+                        return false;
                     }
                 }
             }
@@ -697,10 +695,8 @@ impl CPU {
                     if !self.write_reg(rd, 0xFFFFFFFF) {
                         return false;
                     } // 2^32 - 1
-                } else {
-                    if !self.write_reg(rd, lhs / rhs) {
-                        return false;
-                    }
+                } else if !self.write_reg(rd, lhs / rhs) {
+                    return false;
                 }
             }
             Instruction::Rem { rd, rs1, rs2 } => {
@@ -727,10 +723,8 @@ impl CPU {
                         if !self.write_reg(rd, 0) {
                             return false;
                         } // Remainder of -2^31 % -1 is 0
-                    } else {
-                        if !self.write_reg(rd, (dividend % divisor) as u32) {
-                            return false;
-                        }
+                    } else if !self.write_reg(rd, (dividend % divisor) as u32) {
+                        return false;
                     }
                 }
             }
@@ -749,10 +743,8 @@ impl CPU {
                     if !self.write_reg(rd, lhs) {
                         return false;
                     }
-                } else {
-                    if !self.write_reg(rd, lhs % rhs) {
-                        return false;
-                    }
+                } else if !self.write_reg(rd, lhs % rhs) {
+                    return false;
                 }
             }
 
@@ -840,7 +832,7 @@ impl CPU {
                 let mut new_val = old;
                 match op {
                     CsrOp::Csrrw => {
-                        if !(imm == false && rs1 == 0) {
+                        if imm || rs1 != 0 {
                             new_val = src;
                         }
                     }
@@ -863,7 +855,7 @@ impl CPU {
                             panic!("failed to update satp");
                         }
                     } else if !self.write_csr(csr, new_val) {
-                        panic!("failed to write csr 0x{:03x}", csr);
+                        panic!("failed to write csr 0x{csr:03x}");
                     }
                 }
 

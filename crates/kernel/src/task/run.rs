@@ -47,17 +47,16 @@ pub fn run_task(task_idx: usize) {
         sp,
     );
     unsafe {
-        if let Some(task) = TASKS.get_mut().get(task_idx) {
-            if let Some(caller_idx) = task.caller_task_id {
-                if let Some(caller_task) = TASKS.get_mut().get(caller_idx) {
-                    logf!(
-                        "run_task: return ra=0x%x sp=0x%x for caller %d",
-                        caller_task.tf.regs[REG_RA],
-                        caller_task.tf.regs[REG_SP],
-                        caller_idx as u32
-                    );
-                }
-            }
+        if let Some(task) = TASKS.get_mut().get(task_idx)
+            && let Some(caller_idx) = task.caller_task_id
+            && let Some(caller_task) = TASKS.get_mut().get(caller_idx)
+        {
+            logf!(
+                "run_task: return ra=0x%x sp=0x%x for caller %d",
+                caller_task.tf.regs[REG_RA],
+                caller_task.tf.regs[REG_SP],
+                caller_idx as u32
+            );
         }
     }
     // Prepare to enter user mode via sret: set sepc and clear sstatus.SPP.
@@ -94,6 +93,10 @@ pub fn run_task(task_idx: usize) {
 }
 
 /// Save the full kernel register set into TASKS[0] and then run the task.
+///
+/// # Safety
+/// This function assumes `task_idx` refers to a valid slot and that the caller
+/// has set up the kernel stack and trap frame layout as expected by the assembly.
 #[unsafe(naked)]
 pub unsafe extern "C" fn kernel_run_task(task_idx: usize) -> ! {
     core::arch::naked_asm!(

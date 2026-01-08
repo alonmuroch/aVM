@@ -64,10 +64,7 @@ pub(crate) fn sys_alloc(args: [u32; 6]) -> u32 {
         }
     };
 
-    match alloc_in_task(task, size, align) {
-        Some(addr) => addr,
-        None => 0,
-    }
+    alloc_in_task(task, size, align).unwrap_or_default()
 }
 
 pub(crate) fn sys_dealloc(_args: [u32; 6]) -> u32 {

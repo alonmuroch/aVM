@@ -18,10 +18,10 @@ pub(crate) fn transfer(tx: &Transaction) {
 fn set_receipt(success: bool, error_code: u32) {
     let tx_idx = unsafe { *CURRENT_TX.get_mut() };
     unsafe {
-        if let Some(receipts) = RECEIPTS.get_mut().as_mut() {
-            if let Some(receipt) = receipts.get_mut(tx_idx) {
-                receipt.result = Result::new(success, error_code);
-            }
+        if let Some(receipts) = RECEIPTS.get_mut().as_mut()
+            && let Some(receipt) = receipts.get_mut(tx_idx)
+        {
+            receipt.result = Result::new(success, error_code);
         }
     }
 }

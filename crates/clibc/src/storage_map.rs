@@ -78,11 +78,10 @@ impl StorageMap {
         let mut full_key = [0u8; 64];
         full_key[..key.len()].copy_from_slice(key);
 
-        let val_bytes =
-            unsafe { core::slice::from_raw_parts((&val as *const V) as *const u8, size_of::<V>()) };
-
         #[cfg(target_arch = "riscv32")]
         unsafe {
+            let val_bytes =
+                core::slice::from_raw_parts((&val as *const V) as *const u8, size_of::<V>());
             let packed_lens: u32 = ((key.len() as u32) << 16) | (domain.len() as u32);
             core::arch::asm!(
                 "li a7, 2", // syscall_storage_write
@@ -100,6 +99,7 @@ impl StorageMap {
         #[cfg(not(target_arch = "riscv32"))]
         {
             let _ = address;
+            let _ = val;
             // For non-RISC-V targets, do nothing
         }
     }

@@ -52,6 +52,7 @@ use crate::global::NEXT_ASID;
 
 pub mod prep;
 pub mod run;
+#[allow(clippy::module_inception)]
 pub mod task;
 mod trampoline;
 

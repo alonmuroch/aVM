@@ -65,7 +65,7 @@ pub(crate) fn sys_call_program(args: [u32; 6], ctx: &mut SyscallContext<'_>) -> 
 
     let task_idx = unsafe {
         let tasks = TASKS.get_mut();
-        if tasks.push(task).is_err() {
+        if !tasks.push(task) {
             logf!("sys_call_program: task list full");
             return 0;
         }

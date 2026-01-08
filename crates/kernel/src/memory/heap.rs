@@ -1,5 +1,4 @@
 use core::alloc::{GlobalAlloc, Layout};
-use core::ptr;
 
 #[derive(Clone, Copy)]
 pub(crate) struct BumpAllocator {
@@ -60,7 +59,7 @@ struct KernelAlloc;
 
 unsafe impl GlobalAlloc for KernelAlloc {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        alloc(layout.size(), layout.align()).unwrap_or(ptr::null_mut())
+        alloc(layout.size(), layout.align()).unwrap_or_default()
     }
 
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {}

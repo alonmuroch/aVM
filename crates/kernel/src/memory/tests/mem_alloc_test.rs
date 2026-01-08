@@ -15,8 +15,14 @@ mod results;
 #[path = "../../tests/utils.rs"]
 mod utils;
 
+/// # Safety
+/// The pointers must be valid for the provided lengths.
 #[unsafe(no_mangle)]
-pub extern "C" fn _start(input_ptr: *const u8, input_len: usize, boot_info_ptr: *const BootInfo) {
+pub unsafe extern "C" fn _start(
+    input_ptr: *const u8,
+    input_len: usize,
+    boot_info_ptr: *const BootInfo,
+) {
     log!("kernel mem alloc test boot");
     let info = utils::init_test_kernel(boot_info_ptr);
 
@@ -40,7 +46,7 @@ pub extern "C" fn _start(input_ptr: *const u8, input_len: usize, boot_info_ptr: 
 }
 
 fn test_heap_alignment() -> Result<(), u32> {
-    let ptr = heap::alloc(32, 16).unwrap_or(core::ptr::null_mut());
+    let ptr = heap::alloc(32, 16).unwrap_or_default();
     if ptr.is_null() {
         return Err(1);
     }

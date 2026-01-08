@@ -37,7 +37,7 @@ pub fn console_write(
     let fmt_slice = match borrowed_memory.mem_slice(fmt_start, fmt_end) {
         Some(s) => s,
         None => {
-            println!("invalid format string @ 0x{:08x}", fmt_ptr);
+            println!("invalid format string @ 0x{fmt_ptr:08x}");
             return 0;
         }
     };
@@ -46,8 +46,8 @@ pub fn console_write(
         Ok(s) => s,
         Err(e) => {
             println!("invalid UTF-8 in format string");
-            println!("bytes: {:?}", fmt_bytes);
-            println!("error: {}", e);
+            println!("bytes: {fmt_bytes:?}");
+            println!("error: {e}");
             return 0;
         }
     };
@@ -148,11 +148,11 @@ pub fn console_write(
                     _ => output.push_str("<err>"),
                 },
                 Some('x') => match args_iter.next() {
-                    Some(Arg::U32(v)) => output.push_str(&format!("{:08x}", v)),
+                    Some(Arg::U32(v)) => output.push_str(&format!("{v:08x}")),
                     _ => output.push_str("<err>"),
                 },
                 Some('f') => match args_iter.next() {
-                    Some(Arg::F32(f)) => output.push_str(&format!("{}", f)),
+                    Some(Arg::F32(f)) => output.push_str(&format!("{f}")),
                     _ => output.push_str("<err>"),
                 },
                 Some('c') => match args_iter.next() {
@@ -170,7 +170,7 @@ pub fn console_write(
                             if i > 0 {
                                 output.push_str(", ");
                             }
-                            output.push_str(&format!("0x{:02x}", byte));
+                            output.push_str(&format!("0x{byte:02x}"));
                         }
                         output.push(']');
                     }
@@ -184,7 +184,7 @@ pub fn console_write(
                                 output.push_str(", ");
                             }
                             let val = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-                            output.push_str(&format!("{}", val));
+                            output.push_str(&format!("{val}"));
                         }
                         output.push(']');
                     }
@@ -197,7 +197,7 @@ pub fn console_write(
                             if i > 0 {
                                 output.push_str(", ");
                             }
-                            output.push_str(&format!("{}", byte));
+                            output.push_str(&format!("{byte}"));
                         }
                         output.push(']');
                     }
@@ -213,10 +213,10 @@ pub fn console_write(
     let _ = caller_mode;
     match verbose_writer {
         Some(writer) => {
-            let _ = writeln!(writer.borrow_mut(), "{}", output);
+            let _ = writeln!(writer.borrow_mut(), "{output}");
         }
         None => {
-            println!("{}", output);
+            println!("{output}");
         }
     }
     0

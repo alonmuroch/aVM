@@ -89,7 +89,7 @@ impl VM {
             let line = &borrowed_memory.mem()[addr..end.min(addr + 16)];
 
             // EDUCATIONAL: Convert bytes to hex strings
-            let hex: Vec<String> = line.iter().map(|b| format!("{:02x}", b)).collect();
+            let hex: Vec<String> = line.iter().map(|b| format!("{b:02x}")).collect();
             let hex_str = hex.join(" ");
 
             // EDUCATIONAL: Convert bytes to ASCII (printable characters only)
@@ -98,7 +98,7 @@ impl VM {
                 .map(|&b| if b.is_ascii_graphic() { b as char } else { '.' })
                 .collect();
 
-            println!("{:08x}  {:<47}  |{}|", addr, hex_str, ascii);
+            println!("{addr:08x}  {hex_str:<47}  |{ascii}|");
         }
         println!("-------------------");
     }
@@ -130,10 +130,9 @@ impl VM {
         ];
 
         // EDUCATIONAL: Display each register with its name and value
-        for i in 0..32 {
-            let name = ABI_NAMES[i];
+        for (i, name) in ABI_NAMES.iter().enumerate() {
             let val = self.cpu.regs[i];
-            println!("x{:02} ({:<4}) = 0x{:08x} ({})", i, name, val, val);
+            println!("x{i:02} ({name:<4}) = 0x{val:08x} ({val})");
         }
 
         // EDUCATIONAL: Show program counter separately

@@ -32,21 +32,18 @@ fn main() {
             .unwrap_or_else(|| "Contract".to_string())
     };
 
-    println!(
-        "Generating client code for {} as {}",
-        abi_file, contract_name
-    );
+    println!("Generating client code for {abi_file} as {contract_name}");
 
     match AbiCodeGenerator::from_abi_file(abi_file, contract_name) {
         Ok(code) => {
             if let Err(e) = fs::write(output_file, code) {
-                eprintln!("Failed to write output file: {}", e);
+                eprintln!("Failed to write output file: {e}");
                 std::process::exit(1);
             }
-            println!("✓ Generated client code: {}", output_file);
+            println!("✓ Generated client code: {output_file}");
         }
         Err(e) => {
-            eprintln!("Failed to generate client code: {}", e);
+            eprintln!("Failed to generate client code: {e}");
             std::process::exit(1);
         }
     }

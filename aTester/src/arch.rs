@@ -50,3 +50,9 @@ impl ArchRegistry {
             .map(|runner| runner.as_ref())
     }
 }
+
+impl Default for ArchRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}

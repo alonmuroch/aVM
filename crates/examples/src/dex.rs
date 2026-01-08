@@ -253,7 +253,7 @@ fn swap(program: Address, caller: Address, mut parser: DataParser) -> Result {
     }
 }
 
-fn dex_entry(program: Address, caller: Address, data: &[u8]) -> Result {
+fn program_entry(program: Address, caller: Address, data: &[u8]) -> Result {
     // Simple selector-based router: first byte is op, remainder is args for the op handlers.
     if data.is_empty() {
         vm_panic(b"missing selector");
@@ -270,4 +270,4 @@ fn dex_entry(program: Address, caller: Address, data: &[u8]) -> Result {
     }
 }
 
-entrypoint!(dex_entry);
+entrypoint!(program_entry);

@@ -101,7 +101,7 @@ impl Storage {
     ///
     /// RETURNS: A composite key string in the format "domain:key"
     fn build_composite_key(domain: &str, key: &str) -> String {
-        format!("{}:{}", domain, key)
+        format!("{domain}:{key}")
     }
 
     /// Retrieves a value from storage by domain and key.
@@ -167,7 +167,7 @@ impl Storage {
         std::println!("--- Storage Dump ---");
         for (key, value) in self.map.borrow().iter() {
             let key_str = key;
-            let value_hex: Vec<String> = value.iter().map(|b| format!("{:02x}", b)).collect();
+            let value_hex: Vec<String> = value.iter().map(|b| format!("{b:02x}")).collect();
             std::println!(
                 "Key: {:<20} | Value ({} bytes): {}",
                 key_str,

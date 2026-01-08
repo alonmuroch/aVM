@@ -23,7 +23,7 @@ use clibc::{DataParser, entrypoint, require, types::result::Result, vm_panic};
 /// - data: Binary data containing the function selector and arguments
 ///
 /// RETURN VALUE: A Result indicating success/failure and any return data
-fn my_vm_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
+fn program_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
     // EDUCATIONAL: Use the router to handle multiple function calls
     // The router decodes the input data and calls the appropriate function
     route(data, program, _caller, |_to, _from, call| {
@@ -87,4 +87,4 @@ fn other(_data: &[u8]) -> Result {
     vm_panic(b"Intentional failure");
 }
 
-entrypoint!(my_vm_entry);
+entrypoint!(program_entry);

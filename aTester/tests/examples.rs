@@ -115,7 +115,7 @@ fn examples_tests() {
                 details.push_str(&format!("{}: {}\n", report.name, detail));
             }
         }
-        panic!("example test failures:\n{}", details);
+        panic!("example test failures:\n{details}");
     }
 }
 

@@ -48,7 +48,7 @@ impl StorageKey for AllowanceKey {
     }
 }
 
-unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
+unsafe fn program_entry(program: Address, caller: Address, data: &[u8]) -> Result {
     route(data, program, caller, |_to, _from, call| {
         match call.selector {
             0x01 => {
@@ -182,4 +182,4 @@ fn balance_of(program: &Address, owner: Address) -> u32 {
     }
 }
 // ---- Entry point ----
-entrypoint!(main_entry);
+entrypoint!(program_entry);

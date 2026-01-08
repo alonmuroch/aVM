@@ -29,11 +29,17 @@
 #[macro_export]
 macro_rules! entrypoint {
     ($func:path) => {
+        #[cfg(not(target_arch = "riscv32"))]
+        fn main() {
+            // Host stub so guest binaries link without per-file cfg mains.
+        }
+
         /// The main entry point that the VM calls to execute the contract.
         ///
         /// EDUCATIONAL: This function is marked as extern "C" to use C calling
         /// conventions, which is what the VM expects. The #[no_mangle] attribute
         /// prevents the compiler from changing the function name.
+        #[allow(unreachable_code)]
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn entrypoint(
             to_ptr: *const u8,    // Pointer to contract address (20 bytes)

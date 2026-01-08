@@ -28,7 +28,7 @@ fn encode_jalr(rd: u32, rs1: u32, imm12: i32) -> u32 {
 }
 
 fn encode_csrr(rd: u32, csr: u32) -> u32 {
-    (csr << 20) | (0 << 15) | (0b010 << 12) | (rd << 7) | 0x73
+    (csr << 20) | (0b010 << 12) | (rd << 7) | 0x73
 }
 
 /// Build the trap-entry trampoline instructions.
@@ -63,7 +63,7 @@ pub(super) fn map_trampoline_page(root_ppn: u32) {
             .map(|task| task.addr_space.root_ppn)
             .unwrap_or_else(mmu::current_root)
     };
-    let trap_entry = crate::trap::trap_entry as usize as u32;
+    let trap_entry = crate::trap::trap_entry as *const () as usize as u32;
     let trap_trampoline = build_trap_trampoline(kernel_root, trap_entry);
     // Stash both trampolines in a single shared page.
     let mut tramp_bytes = [0u8; TRAP_TRAMPOLINE_OFFSET + TRAP_TRAMPOLINE_WORDS * 4];

@@ -19,12 +19,9 @@ persist_struct!(Config {
     timeout_ms: u64,
 });
 
-fn my_vm_entry(program: Address, _caller: Address, _data: &[u8]) -> Result {
+fn program_entry(program: Address, _caller: Address, _data: &[u8]) -> Result {
     // --- User ---
-    require(
-        User::load(&program).is_none() == true,
-        b"user already exists",
-    );
+    require(User::load(&program).is_none(), b"user already exists");
     let mut user = User {
         id: 1000,
         active: false,
@@ -45,10 +42,7 @@ fn my_vm_entry(program: Address, _caller: Address, _data: &[u8]) -> Result {
     require(reloaded_user.id == 40000, b"user id must be 40000");
 
     // --- Config ---
-    require(
-        Config::load(&program).is_none() == true,
-        b"config already exists",
-    );
+    require(Config::load(&program).is_none(), b"config already exists");
     let mut config = Config {
         retries: 10,
         timeout_ms: 10,
@@ -76,4 +70,4 @@ fn my_vm_entry(program: Address, _caller: Address, _data: &[u8]) -> Result {
     Result::new(true, 0)
 }
 
-entrypoint!(my_vm_entry);
+entrypoint!(program_entry);

@@ -28,5 +28,7 @@ pub fn pass() -> ! {
 #[inline(never)]
 pub fn halt() -> ! {
     unsafe { core::arch::asm!("ebreak") };
-    loop {}
+    loop {
+        core::hint::spin_loop();
+    }
 }

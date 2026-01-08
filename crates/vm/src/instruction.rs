@@ -523,7 +523,7 @@ pub enum MiscAluOp {
 impl Instruction {
     pub fn pretty_print(&self) -> String {
         fn reg(r: usize) -> String {
-            format!("x{}", r) // or use register aliases like a0, t1, etc. if desired
+            format!("x{r}") // or use register aliases like a0, t1, etc. if desired
         }
 
         match self {
@@ -716,7 +716,7 @@ impl Instruction {
             Instruction::Jr { rs1 } => format!("jr   {}", reg(*rs1)),
             Instruction::Ret => "ret".to_string(),
             Instruction::Mv { rd, rs2 } => format!("mv   {}, {}", reg(*rd), reg(*rs2)),
-            Instruction::Addi16sp { imm } => format!("addi16sp sp, {}", imm),
+            Instruction::Addi16sp { imm } => format!("addi16sp sp, {imm}"),
             Instruction::Addi4spn { rd, imm } => format!("c.addi4spn {}, {}", reg(*rd), imm),
 
             Instruction::Nop => "nop".to_string(),
@@ -755,7 +755,7 @@ impl Instruction {
                         }
                     }
                 };
-                let src = if *imm { format!("{}", rs1) } else { reg(*rs1) };
+                let src = if *imm { format!("{rs1}") } else { reg(*rs1) };
                 format!("{} {}, {}, 0x{:03x}", op_str, reg(*rd), src, csr)
             }
 

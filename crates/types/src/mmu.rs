@@ -115,7 +115,7 @@ pub fn map_to_physical<T: Sv32PageTable>(
     len: usize,
     perms: Sv32PagePerms,
 ) -> bool {
-    if phys_start as usize % pt.page_size() != 0 {
+    if !(phys_start as usize).is_multiple_of(pt.page_size()) {
         return false;
     }
     map_range_internal(
@@ -223,14 +223,14 @@ fn map_page<T: Sv32PageTable>(
 
     let leaf_ppn = match (existing_valid, phys_override) {
         (true, Some(phys)) => {
-            if (phys as usize) % page_size != 0 {
+            if !(phys as usize).is_multiple_of(page_size) {
                 return false;
             }
             phys / page_size as u32
         }
         (true, None) => existing_ppn,
         (false, Some(phys)) => {
-            if (phys as usize) % page_size != 0 {
+            if !(phys as usize).is_multiple_of(page_size) {
                 return false;
             }
             phys / page_size as u32

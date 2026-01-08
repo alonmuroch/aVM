@@ -134,7 +134,7 @@ impl CPU {
     /// - All registers start at 0 (except x0 which is always 0)
     /// - Verbose logging is disabled by default
     pub fn new() -> Self {
-        Self::with_metering(Box::new(NoopMeter::default()))
+        Self::with_metering(Box::new(NoopMeter))
     }
 
     /// Creates a new CPU instance with a custom metering implementation.
@@ -171,10 +171,10 @@ impl CPU {
 
         match &self.verbose_writer {
             Some(writer) => {
-                let _ = write!(writer.borrow_mut(), "{}\n", message);
+                let _ = writeln!(writer.borrow_mut(), "{message}");
             }
             None => {
-                println!("{}", message);
+                println!("{message}");
             }
         }
     }
@@ -190,7 +190,7 @@ impl CPU {
         // Provide simple defaults for common CSRs; fall back to stored values or zero.
         Some(match csr {
             0xF14 => *self.csrs.get(&csr).unwrap_or(&0), // mhartid
-            0xF11 | 0xF12 | 0xF13 => *self.csrs.get(&csr).unwrap_or(&0), // mvendorid/marchid/mimpid
+            0xF11..=0xF13 => *self.csrs.get(&csr).unwrap_or(&0), // mvendorid/marchid/mimpid
             0x301 => *self.csrs.get(&csr).unwrap_or(&0), // misa
             0x300 => *self.csrs.get(&csr).unwrap_or(&0), // mstatus
             CSR_SSTATUS => *self.csrs.get(&csr).unwrap_or(&0),
@@ -377,7 +377,7 @@ impl CPU {
         if let Some(bytes) = memory.mem_slice(pc_va, end_va) {
             let hex_bytes = bytes
                 .iter()
-                .map(|b| format!("{:02x}", b))
+                .map(|b| format!("{b:02x}"))
                 .collect::<Vec<_>>()
                 .join(" ");
             self.log(
@@ -418,10 +418,8 @@ impl CPU {
 
         // EDUCATIONAL: Only increment PC if the instruction didn't change it
         // This handles branches, jumps, and calls correctly
-        if self.pc == old_pc {
-            if !self.pc_add(size as u32) {
-                return false;
-            }
+        if self.pc == old_pc && !self.pc_add(size as u32) {
+            return false;
         }
         result
     }
@@ -445,7 +443,7 @@ impl CPU {
             // EDUCATIONAL: Convert bytes to hex for human-readable debugging
             let hex_dump = slice_ref
                 .iter()
-                .map(|b| format!("{:02x}", b)) // still needs deref
+                .map(|b| format!("{b:02x}")) // still needs deref
                 .collect::<Vec<_>>()
                 .join(" ");
 
@@ -548,5 +546,11 @@ impl CPU {
         }
         self.pc = target;
         true
+    }
+}
+
+impl Default for CPU {
+    fn default() -> Self {
+        Self::new()
     }
 }

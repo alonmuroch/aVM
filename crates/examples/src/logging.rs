@@ -7,7 +7,7 @@ use clibc::{DataParser, concat_str, entrypoint, log, logf, types::result::Result
 use core::fmt;
 
 /// Comprehensive logging demonstration showing all format specifiers
-unsafe fn logging(program: Address, _caller: Address, data: &[u8]) -> Result {
+unsafe fn program_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
     let _ = program;
     // Simple string logging
     logf!("=== Logging Demo Started ===");
@@ -28,7 +28,7 @@ unsafe fn logging(program: Address, _caller: Address, data: &[u8]) -> Result {
     logf!("Character: %c", ch);
 
     // Floating point
-    let pi_bits = 3.14159f32.to_bits();
+    let pi_bits = core::f32::consts::PI.to_bits();
     logf!("Pi approximation: %f", pi_bits);
 
     // String logging - now simplified!
@@ -133,4 +133,4 @@ impl fmt::Display for Point {
     }
 }
 
-entrypoint!(logging);
+entrypoint!(program_entry);

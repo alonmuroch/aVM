@@ -31,10 +31,10 @@ use sha2::{Digest, Sha256};
 /// - Creating commitments for reveal schemes
 /// - Generating deterministic IDs from data
 /// - Proof of data existence at a point in time
-fn hasher_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
+fn program_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
     let _ = program;
     // Validate that we have some input data
-    require(data.len() > 0, b"Input data cannot be empty");
+    require(!data.is_empty(), b"Input data cannot be empty");
 
     // Create a new SHA-256 hasher instance
     let mut hasher = Sha256::new();
@@ -56,4 +56,4 @@ fn hasher_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
 }
 
 // Register the function as the entrypoint
-entrypoint!(hasher_entry);
+entrypoint!(program_entry);

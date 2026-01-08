@@ -1,5 +1,4 @@
 use compiler::elf::parse_elf_from_bytes;
-use state;
 use types::address::Address;
 use types::transaction::{Transaction, TransactionBundle, TransactionType};
 
@@ -179,12 +178,12 @@ fn build_erc20_bundle() -> Result<TransactionBundle, String> {
             from: deployer,
             data: encode_router_calls(&[HostFuncCall {
                 selector: 0x01,
-                args: (|| {
+                args: {
                     let max_supply: u32 = 100000000;
                     let mut max_supply_bytes = max_supply.to_le_bytes().to_vec();
                     max_supply_bytes.extend(vec![18u8]);
                     max_supply_bytes
-                })(),
+                },
             }]),
             value: 0,
             nonce: 0,
@@ -195,13 +194,13 @@ fn build_erc20_bundle() -> Result<TransactionBundle, String> {
             from: deployer,
             data: encode_router_calls(&[HostFuncCall {
                 selector: 0x02,
-                args: (|| {
+                args: {
                     let to_addr = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d2");
                     let mut args = to_addr.0.to_vec();
                     let amount: u32 = 50000000;
                     args.extend(amount.to_le_bytes());
                     args
-                })(),
+                },
             }]),
             value: 0,
             nonce: 0,
@@ -212,10 +211,10 @@ fn build_erc20_bundle() -> Result<TransactionBundle, String> {
             from: deployer,
             data: encode_router_calls(&[HostFuncCall {
                 selector: 0x05,
-                args: (|| {
+                args: {
                     let owner = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0");
                     owner.0.to_vec()
-                })(),
+                },
             }]),
             value: 0,
             nonce: 0,
@@ -247,11 +246,11 @@ fn build_call_program_bundle() -> Result<TransactionBundle, String> {
             tx_type: TransactionType::ProgramCall,
             to: caller,
             from: caller,
-            data: (|| {
+            data: {
                 let mut data = callee.0.to_vec();
                 data.extend(vec![100, 0, 0, 0, 42, 0, 0, 0]);
                 data
-            })(),
+            },
             value: 0,
             nonce: 0,
         },
@@ -379,11 +378,11 @@ fn build_guest_transfer_syscall_bundle() -> Result<TransactionBundle, String> {
             tx_type: TransactionType::ProgramCall,
             to: program,
             from: sender,
-            data: (|| {
+            data: {
                 let mut data = recipient.0.to_vec();
                 data.extend_from_slice(&42u64.to_le_bytes());
                 data
-            })(),
+            },
             value: 0,
             nonce: 1,
         },
@@ -410,13 +409,13 @@ fn build_dex_amm_bundle() -> Result<TransactionBundle, String> {
             from: user3,
             data: encode_router_calls(&[HostFuncCall {
                 selector: 0x01,
-                args: (|| {
+                args: {
                     let mut args = Vec::new();
                     let supply: u32 = 1_000_000;
                     args.extend_from_slice(&supply.to_le_bytes());
                     args.push(0);
                     args
-                })(),
+                },
             }]),
             value: 0,
             nonce: 1,
@@ -427,12 +426,12 @@ fn build_dex_amm_bundle() -> Result<TransactionBundle, String> {
             from: user3,
             data: encode_router_calls(&[HostFuncCall {
                 selector: 0x03,
-                args: (|| {
+                args: {
                     let mut args = dex.0.to_vec();
                     let amount: u32 = 500_000;
                     args.extend_from_slice(&amount.to_le_bytes());
                     args
-                })(),
+                },
             }]),
             value: 0,
             nonce: 2,
@@ -449,13 +448,13 @@ fn build_dex_amm_bundle() -> Result<TransactionBundle, String> {
             tx_type: TransactionType::ProgramCall,
             to: dex,
             from: user3,
-            data: (|| {
+            data: {
                 let mut data = Vec::new();
                 data.push(0x01);
                 data.extend_from_slice(&100_000u64.to_le_bytes());
                 data.extend_from_slice(&500_000u64.to_le_bytes());
                 data
-            })(),
+            },
             value: 0,
             nonce: 4,
         },
@@ -463,13 +462,13 @@ fn build_dex_amm_bundle() -> Result<TransactionBundle, String> {
             tx_type: TransactionType::ProgramCall,
             to: dex,
             from: user2,
-            data: (|| {
+            data: {
                 let mut data = Vec::new();
                 data.push(0x03);
                 data.push(0x00);
                 data.extend_from_slice(&1_000u64.to_le_bytes());
                 data
-            })(),
+            },
             value: 0,
             nonce: 0,
         },
@@ -477,12 +476,12 @@ fn build_dex_amm_bundle() -> Result<TransactionBundle, String> {
             tx_type: TransactionType::ProgramCall,
             to: dex,
             from: user3,
-            data: (|| {
+            data: {
                 let mut data = Vec::new();
                 data.push(0x02);
                 data.extend_from_slice(&100_000u64.to_le_bytes());
                 data
-            })(),
+            },
             value: 0,
             nonce: 5,
         },

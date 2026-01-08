@@ -24,6 +24,12 @@ impl AvmRunner {
     }
 }
 
+impl Default for AvmRunner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ArchRunner for AvmRunner {
     fn name(&self) -> &str {
         "avm"

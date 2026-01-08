@@ -29,6 +29,7 @@ impl<T> Global<T> {
 
     /// # Safety
     /// Callers must ensure exclusive access or otherwise serialize mutations.
+    #[allow(clippy::mut_from_ref)]
     pub unsafe fn get_mut(&self) -> &mut T {
         unsafe { &mut *self.inner.get() }
     }
@@ -115,9 +116,13 @@ impl TaskList {
         self.len
     }
 
-    pub fn push(&mut self, task: Task) -> Result<&Task, Task> {
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    pub fn push(&mut self, task: Task) -> bool {
         if self.len >= MAX_TASKS {
-            return Err(task);
+            return false;
         }
         let idx = self.len;
         unsafe {
@@ -125,7 +130,7 @@ impl TaskList {
             base.add(idx).write(task);
         }
         self.len += 1;
-        Ok(unsafe { &*(self.slots.as_ptr() as *const Task).add(idx) })
+        true
     }
 
     pub fn get(&self, idx: usize) -> Option<&Task> {
@@ -148,12 +153,12 @@ impl TaskList {
         self.get(KERNEL_TASK_SLOT)
     }
 
-    pub fn set_at(&mut self, idx: usize, task: Task) -> Result<&Task, Task> {
+    pub fn set_at(&mut self, idx: usize, task: Task) -> bool {
         if idx >= MAX_TASKS {
-            return Err(task);
+            return false;
         }
         if idx > self.len {
-            return Err(task);
+            return false;
         }
         if idx < self.len {
             unsafe { ptr::drop_in_place((self.slots.as_mut_ptr() as *mut Task).add(idx)) };
@@ -163,8 +168,8 @@ impl TaskList {
         unsafe {
             let base = self.slots.as_mut_ptr() as *mut Task;
             base.add(idx).write(task);
-            Ok(&*base.add(idx))
         }
+        true
     }
 
     pub fn last(&self) -> Option<&Task> {
@@ -173,6 +178,12 @@ impl TaskList {
         } else {
             self.get(self.len - 1)
         }
+    }
+}
+
+impl Default for TaskList {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -2,7 +2,7 @@ use crate::SerializeField;
 
 impl SerializeField for u8 {
     fn serialize_field(&self, buf: &mut [u8], offset: &mut usize) {
-        if *offset + 1 <= buf.len() {
+        if *offset < buf.len() {
             buf[*offset] = *self;
             *offset += 1;
         }
@@ -11,7 +11,7 @@ impl SerializeField for u8 {
 
 impl SerializeField for bool {
     fn serialize_field(&self, buf: &mut [u8], offset: &mut usize) {
-        if *offset + 1 <= buf.len() {
+        if *offset < buf.len() {
             buf[*offset] = *self as u8;
             *offset += 1;
         }

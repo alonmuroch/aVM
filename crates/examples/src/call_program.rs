@@ -16,7 +16,7 @@ include!("../bin/simple_abi.rs");
 /// The program expects:
 /// - 20 bytes: Address of the simple contract
 /// - 8 bytes: Two u32 values to compare (4 bytes each)
-fn my_vm_entry(program: Address, caller: Address, data: &[u8]) -> Result {
+fn program_entry(program: Address, caller: Address, data: &[u8]) -> Result {
     let _ = program;
     // Ensure there's enough data
     require(data.len() == 28, b"input data must be 28 bytes");
@@ -38,13 +38,11 @@ fn my_vm_entry(program: Address, caller: Address, data: &[u8]) -> Result {
     call_data[4..8].copy_from_slice(&second.to_le_bytes());
 
     // Call the simple contract using the generated client's call_main method
-    let ret = match simple_client.call_main(&caller, &call_data) {
+    match simple_client.call_main(&caller, &call_data) {
         Some(result) => result,
         None => vm_panic(b"program call failed"),
-    };
-
-    ret
+    }
 }
 
 // Register the function as the contract's entrypoint
-entrypoint!(my_vm_entry);
+entrypoint!(program_entry);

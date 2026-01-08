@@ -81,7 +81,7 @@ fn kernel_tests() {
                 details.push_str(&format!("{}: {}\n", report.name, detail));
             }
         }
-        panic!("kernel test failures:\n{}", details);
+        panic!("kernel test failures:\n{details}");
     }
 }
 

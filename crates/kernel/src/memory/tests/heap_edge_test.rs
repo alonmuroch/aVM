@@ -13,8 +13,14 @@ mod results;
 #[path = "../../tests/utils.rs"]
 mod utils;
 
+/// # Safety
+/// The pointers must be valid for the provided lengths.
 #[unsafe(no_mangle)]
-pub extern "C" fn _start(input_ptr: *const u8, input_len: usize, boot_info_ptr: *const BootInfo) {
+pub unsafe extern "C" fn _start(
+    input_ptr: *const u8,
+    input_len: usize,
+    boot_info_ptr: *const BootInfo,
+) {
     log!("kernel heap edge test boot");
     let _info = utils::init_test_kernel(boot_info_ptr);
 
@@ -61,8 +67,8 @@ fn test_monotonic_bump_and_data() -> Result<(), u32> {
     log!("test: monotonic bump allocator behavior");
     log!("subtest: allocations are ordered and writable");
 
-    let a = heap::alloc(32, 8).unwrap_or(core::ptr::null_mut());
-    let b = heap::alloc(32, 8).unwrap_or(core::ptr::null_mut());
+    let a = heap::alloc(32, 8).unwrap_or_default();
+    let b = heap::alloc(32, 8).unwrap_or_default();
     if a.is_null() || b.is_null() {
         return Err(20);
     }
@@ -81,7 +87,7 @@ fn test_monotonic_bump_and_data() -> Result<(), u32> {
 
     log!("subtest: dealloc is a no-op and allocations keep increasing");
     heap::dealloc(a, 32, 8);
-    let c = heap::alloc(16, 8).unwrap_or(core::ptr::null_mut());
+    let c = heap::alloc(16, 8).unwrap_or_default();
     if c.is_null() || (c as usize) <= (b as usize) {
         return Err(23);
     }

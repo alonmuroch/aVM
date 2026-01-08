@@ -14,7 +14,7 @@ pub(crate) fn init_boot_info(boot_info: Option<&BootInfo>) -> Option<&BootInfo> 
         let task = Task::kernel(info.root_ppn, info.heap_ptr, info.va_base, info.va_len);
         unsafe {
             let tasks_slot = TASKS.get_mut();
-            if tasks_slot.set_at(KERNEL_TASK_SLOT, task).is_err() {
+            if !tasks_slot.set_at(KERNEL_TASK_SLOT, task) {
                 log!("kernel task slot unavailable; kernel task not recorded");
             }
             *CURRENT_TASK.get_mut() = KERNEL_TASK_SLOT;

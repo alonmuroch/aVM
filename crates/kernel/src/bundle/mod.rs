@@ -77,7 +77,9 @@ pub(crate) extern "C" fn resume_bundle() -> ! {
         *CURRENT_TX.get_mut() = curr.wrapping_add(1);
     }
     process_bundle();
-    loop {}
+    loop {
+        core::hint::spin_loop();
+    }
 }
 
 fn execute_transaction(tx: &Transaction) -> bool {
@@ -110,5 +112,7 @@ fn bundle_complete() -> ! {
         forget(receipts);
     }
     unsafe { core::arch::asm!("ebreak") };
-    loop {}
+    loop {
+        core::hint::spin_loop();
+    }
 }

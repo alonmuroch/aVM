@@ -403,10 +403,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
         Opcode::Lui => {
             // EDUCATIONAL: 20-bit immediate goes into bits 31:12
             let imm = ((word >> 12) & 0xFFFFF) as i32;
-            Some(Instruction::Lui {
-                rd,
-                imm: imm as i32,
-            })
+            Some(Instruction::Lui { rd, imm })
         }
 
         // EDUCATIONAL: Add Upper Immediate to PC (U-type)
@@ -624,7 +621,7 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
                 match (rs1, rs2) {
                     (_, 0) => Some(Instruction::Jalr {
                         rd: 1,
-                        rs1: rs1,
+                        rs1,
                         offset: 0,
                         compressed: true,
                     }), // C.JALR (implicit rd = x1)
@@ -635,11 +632,7 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
 
         CompressedOpcode::Slli => {
             let shamt = ((hword >> 2) & 0b11111) as u8;
-            Some(Instruction::Slli {
-                rd,
-                rs1,
-                shamt: shamt,
-            }) // emulate as ADDI with left shift beforehand
+            Some(Instruction::Slli { rd, rs1, shamt }) // emulate as ADDI with left shift beforehand
         }
 
         CompressedOpcode::Lwsp => {

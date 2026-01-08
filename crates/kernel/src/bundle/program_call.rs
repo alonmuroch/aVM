@@ -32,7 +32,7 @@ pub(crate) fn program_call(tx: &Transaction, resume: extern "C" fn() -> !) {
         );
         unsafe {
             let tasks_slot = TASKS.get_mut();
-            if tasks_slot.push(task).is_err() {
+            if !tasks_slot.push(task) {
                 log!("program task list full; skipping run");
                 return;
             }

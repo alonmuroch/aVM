@@ -7,9 +7,9 @@ use clibc::{
     DataParser, entrypoint, require, types::address::Address, types::result::Result, vm_panic,
 };
 
-entrypoint!(main);
+entrypoint!(program_entry);
 /// Guest program that demonstrates heap allocation using VM syscalls
-fn main(program: Address, _caller: Address, data: &[u8]) -> Result {
+fn program_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
     let _ = program;
     // Need to import alloc types after entrypoint macro includes the allocator
     use alloc::collections::BTreeMap;
@@ -32,12 +32,9 @@ fn main(program: Address, _caller: Address, data: &[u8]) -> Result {
     let charlie_score = parser.read_u32();
 
     // Test Vec operations
-    let mut numbers = Vec::new();
-    numbers.push(n0);
-    numbers.push(n1);
-    numbers.push(n2);
+    let numbers = Vec::from([n0, n1, n2]);
 
-    match numbers.get(0) {
+    match numbers.first() {
         Some(&n) => require(n == n0, b"First element mismatch"),
         None => vm_panic(b"Vec should not be empty"),
     }
