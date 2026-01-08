@@ -37,6 +37,7 @@ jobs:
 
       - name: 🔍 Run Clippy (guest target)
         run: |
+          CARGO_NIGHTLY="cargo +nightly" make -C crates/examples abi generate_clients
           cargo +nightly clippy -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p clibc --features guest -- -D warnings
           cargo +nightly clippy -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p examples --features binaries -- -D warnings
           cargo +nightly clippy -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p kernel --features guest_kernel -- -D warnings
