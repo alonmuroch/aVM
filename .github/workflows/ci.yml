@@ -43,7 +43,13 @@ jobs:
           cargo +nightly clippy -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p kernel --features guest_kernel -- -D warnings
 
       - name: 🧪 Run cargo check
-        run: cargo check --all --all-targets
+        run: cargo check --workspace --all-targets --exclude clibc --exclude examples --exclude kernel
+
+      - name: 🧪 Run cargo check (guest target)
+        run: |
+          cargo +nightly check -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p clibc --features guest
+          cargo +nightly check -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p examples --features binaries
+          cargo +nightly check -Z build-std=core,alloc,compiler_builtins -Z build-std-features=compiler-builtins-mem --target crates/compiler/targets/avm32.json -p kernel --features guest_kernel
 
       - name: ✅ Run tests
         run: cargo test --all
