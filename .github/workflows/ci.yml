@@ -10,6 +10,8 @@ jobs:
   check:
     name: Check, Lint, Test, Audit
     runs-on: ubuntu-latest
+    env:
+      CARGO_NIGHTLY: cargo +nightly
 
     steps:
       - name: 📥 Checkout repository
