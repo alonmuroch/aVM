@@ -1,3 +1,4 @@
+use crate::cpu::PrivilegeMode;
 use crate::instruction::Instruction;
 
 /// Outcome returned by metering hooks to indicate whether execution should continue.
@@ -51,7 +52,7 @@ pub trait Metering: std::fmt::Debug {
     }
 
     /// Called when a general-purpose register is written.
-    fn on_register_write(&mut self, _reg: usize) -> MeterResult {
+    fn on_register_write(&mut self, _reg: usize, _value: u32, _mode: PrivilegeMode) -> MeterResult {
         MeterResult::Continue
     }
 

@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use a_tests::{AvmRunner, RunOptions, Suite, TestCase, TestEvaluator, TestKind, TestOutcome};
 use types::TransactionReceipt;
+use types::transaction::TransactionType;
 
 #[path = "fixtures/examples.rs"]
 mod fixtures;
@@ -65,8 +67,12 @@ fn examples_tests() {
 
     let target_dir = kernel_elf_dir();
     let state_bytes = test_state_bytes();
-    let cases = all_example_cases()
-        .expect("failed to build example bundles")
+    let example_cases = all_example_cases().expect("failed to build example bundles");
+    let code_sizes = example_cases
+        .iter()
+        .map(|case| (case.name.to_string(), bundle_code_size(&case.bundle)))
+        .collect::<HashMap<_, _>>();
+    let cases = example_cases
         .into_iter()
         .map(|case| {
             println!("Running example: {} - {}", case.name, case.description);
@@ -103,7 +109,7 @@ fn examples_tests() {
         }
     }
 
-    print_summary(&reports);
+    print_summary(&reports, &code_sizes);
 
     let failures: Vec<_> = reports
         .iter()
@@ -121,7 +127,7 @@ fn examples_tests() {
     }
 }
 
-fn print_summary(reports: &[a_tests::TestReport]) {
+fn print_summary(reports: &[a_tests::TestReport], code_sizes: &HashMap<String, u64>) {
     let total_tests = reports.len();
     let passed = reports
         .iter()
@@ -136,16 +142,17 @@ fn print_summary(reports: &[a_tests::TestReport]) {
         .filter(|report| matches!(report.outcome, TestOutcome::Skipped(_)))
         .count();
     let instruction_count: u64 = reports.iter().map(|report| report.instruction_count).sum();
+    let code_size_bytes: u64 = code_sizes.values().sum();
 
     println!("\n=== examples_tests summary ===");
     println!(
-        "{:<32} {:<7} {:>16} {:>10}",
-        "Test",
-        "Result",
-        "Instructions",
-        "Time(ms)"
+        "{:<32} {:<7} {:>16} {:>10} {:>12} {:>12} {:>10}",
+        "Test", "Result", "Instructions", "Time(ms)", "Stack(B)", "Heap(B)", "Code(B)"
     );
-    println!("{:-<32} {:-<7} {:-<16} {:-<10}", "", "", "", "");
+    println!(
+        "{:-<32} {:-<7} {:-<16} {:-<10} {:-<12} {:-<12} {:-<10}",
+        "", "", "", "", "", "", ""
+    );
     for report in reports {
         let result = match report.outcome {
             TestOutcome::Passed => "passed",
@@ -154,20 +161,44 @@ fn print_summary(reports: &[a_tests::TestReport]) {
         };
         let instruction_count = format_u64(report.instruction_count);
         let duration_ms = format_u128(report.duration_ms);
+        let stack_used = format_u64(report.stack_used_bytes);
+        let heap_used = format_u64(report.heap_used_bytes);
+        let code_size = format_u64(
+            code_sizes
+                .get(&report.name)
+                .copied()
+                .unwrap_or(report.code_size_bytes),
+        );
         println!(
-            "{:<32} {:<7} {:>16} {:>10}",
-            report.name, result, instruction_count, duration_ms
+            "{:<32} {:<7} {:>16} {:>10} {:>12} {:>12} {:>10}",
+            report.name, result, instruction_count, duration_ms, stack_used, heap_used, code_size
         );
     }
-    println!("{:-<32} {:-<7} {:-<16} {:-<10}", "", "", "", "");
-    let instruction_count = format_u64(instruction_count);
     println!(
-        "{:<32} {:<7} {:>16} {:>10}",
+        "{:-<32} {:-<7} {:-<16} {:-<10} {:-<12} {:-<12} {:-<10}",
+        "", "", "", "", "", "", ""
+    );
+    let instruction_count = format_u64(instruction_count);
+    let code_size_bytes = format_u64(code_size_bytes);
+    println!(
+        "{:<32} {:<7} {:>16} {:>10} {:>12} {:>12} {:>10}",
         "Total",
         format!("{passed}/{failed}/{skipped}/{total_tests}"),
         instruction_count,
-        ""
+        "",
+        "",
+        "",
+        code_size_bytes
     );
+}
+
+fn bundle_code_size(bundle: &types::transaction::TransactionBundle) -> u64 {
+    bundle
+        .transactions
+        .iter()
+        .filter(|tx| matches!(tx.tx_type, TransactionType::CreateAccount))
+        .map(|tx| tx.data.len() as u64)
+        .sum()
 }
 
 fn format_u64(value: u64) -> String {

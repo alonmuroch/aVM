@@ -28,6 +28,9 @@ pub struct TestReport {
     pub stderr: String,
     pub instruction_count: u64,
     pub duration_ms: u128,
+    pub stack_used_bytes: u64,
+    pub heap_used_bytes: u64,
+    pub code_size_bytes: u64,
 }
 
 pub trait TestEvaluator {
@@ -48,16 +51,27 @@ impl<'a> Suite<'a> {
                 path: case.elf.clone(),
             };
             let start = std::time::Instant::now();
-            let (outcome, exit_code, stdout, stderr, instruction_count) =
-                match runner.run(&elf, &case.options) {
-                    Ok(result) => {
-                        let outcome = self.evaluator.evaluate(case, &result);
-                        (
+            let (
+                outcome,
+                exit_code,
+                stdout,
+                stderr,
+                instruction_count,
+                stack_used_bytes,
+                heap_used_bytes,
+                code_size_bytes,
+            ) = match runner.run(&elf, &case.options) {
+                Ok(result) => {
+                    let outcome = self.evaluator.evaluate(case, &result);
+                    (
                         outcome,
                         result.exit_code,
                         result.stdout,
                         result.stderr,
                         result.instruction_count,
+                        result.stack_used_bytes,
+                        result.heap_used_bytes,
+                        result.code_size_bytes,
                     )
                 }
                 Err(err) => (
@@ -65,6 +79,9 @@ impl<'a> Suite<'a> {
                     -1,
                     String::new(),
                     err.message,
+                    0,
+                    0,
+                    0,
                     0,
                 ),
             };
@@ -78,6 +95,9 @@ impl<'a> Suite<'a> {
                 stderr,
                 instruction_count,
                 duration_ms,
+                stack_used_bytes,
+                heap_used_bytes,
+                code_size_bytes,
             });
         }
         reports

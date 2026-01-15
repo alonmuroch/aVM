@@ -510,7 +510,7 @@ impl CPU {
     /// Returns false if metering halts execution.
     fn write_reg(&mut self, rd: usize, value: u32) -> bool {
         if rd != 0 {
-            if !Self::can_continue(self.metering.on_register_write(rd)) {
+            if !Self::can_continue(self.metering.on_register_write(rd, value, self.priv_mode)) {
                 return false;
             }
             self.regs[rd] = value;

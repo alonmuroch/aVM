@@ -9,6 +9,9 @@ pub struct RunResult {
     pub stderr: String,
     pub output: Vec<u8>,
     pub instruction_count: u64,
+    pub stack_used_bytes: u64,
+    pub heap_used_bytes: u64,
+    pub code_size_bytes: u64,
 }
 
 #[derive(Debug)]

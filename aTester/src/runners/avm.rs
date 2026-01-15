@@ -9,11 +9,11 @@ use goblin::elf::Elf;
 use types::SV32_DIRECT_MAP_BASE;
 use types::boot::BootInfo;
 use types::kernel_result::KERNEL_RESULT_ADDR;
+use vm::instruction::Instruction;
 use vm::memory::{API, HEAP_PTR_OFFSET, MMU, PAGE_SIZE, Perms, Sv32Memory, VirtualAddress};
 use vm::metering::{MeterResult, Metering};
 use vm::registers::Register;
 use vm::vm::VM;
-use vm::instruction::Instruction;
 
 use crate::arch::{ArchRunner, RunError, RunResult};
 use crate::types::{ElfTarget, RunOptions};
@@ -35,11 +35,59 @@ impl Default for AvmRunner {
 #[derive(Debug)]
 struct InstructionCounter {
     count: Rc<Cell<u64>>,
+    kernel_min_sp: Rc<Cell<u32>>,
+    user_base_sp: Rc<Cell<Option<u32>>>,
+    user_min_sp: Rc<Cell<Option<u32>>>,
+    heap_current: Rc<Cell<u64>>,
+    heap_peak: Rc<Cell<u64>>,
 }
+
+const SYSCALL_ALLOC: u32 = 7;
 
 impl Metering for InstructionCounter {
     fn on_instruction(&mut self, _pc: u32, _instr: &Instruction, _size: u8) -> MeterResult {
         self.count.set(self.count.get().saturating_add(1));
+        MeterResult::Continue
+    }
+
+    fn on_register_write(
+        &mut self,
+        reg: usize,
+        value: u32,
+        mode: vm::cpu::PrivilegeMode,
+    ) -> MeterResult {
+        if reg == Register::Sp as usize {
+            match mode {
+                vm::cpu::PrivilegeMode::User => {
+                    if self.user_base_sp.get().is_none() {
+                        self.user_base_sp.set(Some(value));
+                        self.user_min_sp.set(Some(value));
+                    } else if let Some(min_sp) = self.user_min_sp.get()
+                        && value < min_sp
+                    {
+                        self.user_min_sp.set(Some(value));
+                    }
+                }
+                _ => {
+                    let min_sp = self.kernel_min_sp.get();
+                    if value < min_sp {
+                        self.kernel_min_sp.set(value);
+                    }
+                }
+            }
+        }
+        MeterResult::Continue
+    }
+
+    fn on_syscall(&mut self, call_id: u32, args: &[u32; 6]) -> MeterResult {
+        if call_id == SYSCALL_ALLOC {
+            let size = args[0] as u64;
+            let next = self.heap_current.get().saturating_add(size);
+            self.heap_current.set(next);
+            if next > self.heap_peak.get() {
+                self.heap_peak.set(next);
+            }
+        }
         MeterResult::Continue
     }
 }
@@ -57,7 +105,7 @@ impl ArchRunner for AvmRunner {
         let total_size = options.vm_memory_size.unwrap_or(16 * 1024 * 1024);
         let memory = Rc::new(Sv32Memory::new(total_size, PAGE_SIZE));
         let heap_ptr = Rc::new(Cell::new(0u32));
-        let entry_point = load_kernel(&elf_bytes, &memory, heap_ptr.as_ref())?;
+        let (entry_point, code_size_bytes) = load_kernel(&elf_bytes, &memory, heap_ptr.as_ref())?;
 
         if options.input.len() > 3usize {
             return Err(RunError {
@@ -82,8 +130,19 @@ impl ArchRunner for AvmRunner {
         vm.set_reg_u32(Register::Sp, KERNEL_STACK_TOP);
         vm.cpu.verbose = options.verbose;
         let instruction_count = Rc::new(Cell::new(0u64));
+        let kernel_base_sp = vm.cpu.regs[Register::Sp as usize];
+        let kernel_min_sp = Rc::new(Cell::new(kernel_base_sp));
+        let user_base_sp = Rc::new(Cell::new(None));
+        let user_min_sp = Rc::new(Cell::new(None));
+        let heap_current = Rc::new(Cell::new(0u64));
+        let heap_peak = Rc::new(Cell::new(0u64));
         vm.set_metering(Box::new(InstructionCounter {
             count: Rc::clone(&instruction_count),
+            kernel_min_sp: Rc::clone(&kernel_min_sp),
+            user_base_sp: Rc::clone(&user_base_sp),
+            user_min_sp: Rc::clone(&user_min_sp),
+            heap_current: Rc::clone(&heap_current),
+            heap_peak: Rc::clone(&heap_peak),
         }));
 
         let writer = Rc::new(RefCell::new(StringWriter::default()));
@@ -124,6 +183,11 @@ impl ArchRunner for AvmRunner {
         let exit_code = 0;
         let stderr = String::new();
         let instruction_count = instruction_count.get();
+        let stack_used_bytes = match (user_base_sp.get(), user_min_sp.get()) {
+            (Some(base), Some(min)) => base.saturating_sub(min) as u64,
+            _ => kernel_base_sp.saturating_sub(kernel_min_sp.get()) as u64,
+        };
+        let heap_used_bytes = heap_peak.get();
 
         Ok(RunResult {
             exit_code,
@@ -131,6 +195,9 @@ impl ArchRunner for AvmRunner {
             stderr,
             output,
             instruction_count,
+            stack_used_bytes,
+            heap_used_bytes,
+            code_size_bytes,
         })
     }
 }
@@ -143,7 +210,7 @@ fn load_kernel(
     elf_bytes: &[u8],
     memory: &Rc<Sv32Memory>,
     heap_ptr: &Cell<u32>,
-) -> Result<u32, RunError> {
+) -> Result<(u32, u64), RunError> {
     let elf = parse_elf_from_bytes(elf_bytes).map_err(|e| RunError {
         message: format!("failed to parse kernel elf: {e}"),
     })?;
@@ -156,6 +223,7 @@ fn load_kernel(
     let (code, code_base) = elf.get_flat_code().ok_or_else(|| RunError {
         message: "kernel elf missing .text".to_string(),
     })?;
+    let code_size_bytes = code.len() as u64;
     let (rodata, ro_base) = elf.get_flat_rodata().unwrap_or((Vec::new(), code_base));
     let (bss, bss_base) = elf.get_flat_bss().unwrap_or((Vec::new(), code_base));
 
@@ -227,7 +295,7 @@ fn load_kernel(
         });
     }
 
-    Ok(entry_point)
+    Ok((entry_point, code_size_bytes))
 }
 
 fn read_kernel_blob(memory: &Sv32Memory) -> Option<Vec<u8>> {
