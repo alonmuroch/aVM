@@ -103,6 +103,8 @@ fn examples_tests() {
         }
     }
 
+    print_summary(&reports);
+
     let failures: Vec<_> = reports
         .iter()
         .filter(|report| matches!(report.outcome, TestOutcome::Failed(_)))
@@ -117,6 +119,77 @@ fn examples_tests() {
         }
         panic!("example test failures:\n{details}");
     }
+}
+
+fn print_summary(reports: &[a_tests::TestReport]) {
+    let total_tests = reports.len();
+    let passed = reports
+        .iter()
+        .filter(|report| matches!(report.outcome, TestOutcome::Passed))
+        .count();
+    let failed = reports
+        .iter()
+        .filter(|report| matches!(report.outcome, TestOutcome::Failed(_)))
+        .count();
+    let skipped = reports
+        .iter()
+        .filter(|report| matches!(report.outcome, TestOutcome::Skipped(_)))
+        .count();
+    let instruction_count: u64 = reports.iter().map(|report| report.instruction_count).sum();
+
+    println!("\n=== examples_tests summary ===");
+    println!(
+        "{:<32} {:<7} {:>16} {:>10}",
+        "Test",
+        "Result",
+        "Instructions",
+        "Time(ms)"
+    );
+    println!("{:-<32} {:-<7} {:-<16} {:-<10}", "", "", "", "");
+    for report in reports {
+        let result = match report.outcome {
+            TestOutcome::Passed => "passed",
+            TestOutcome::Failed(_) => "failed",
+            TestOutcome::Skipped(_) => "skipped",
+        };
+        let instruction_count = format_u64(report.instruction_count);
+        let duration_ms = format_u128(report.duration_ms);
+        println!(
+            "{:<32} {:<7} {:>16} {:>10}",
+            report.name, result, instruction_count, duration_ms
+        );
+    }
+    println!("{:-<32} {:-<7} {:-<16} {:-<10}", "", "", "", "");
+    let instruction_count = format_u64(instruction_count);
+    println!(
+        "{:<32} {:<7} {:>16} {:>10}",
+        "Total",
+        format!("{passed}/{failed}/{skipped}/{total_tests}"),
+        instruction_count,
+        ""
+    );
+}
+
+fn format_u64(value: u64) -> String {
+    format_number(value.to_string())
+}
+
+fn format_u128(value: u128) -> String {
+    format_number(value.to_string())
+}
+
+fn format_number(mut digits: String) -> String {
+    let mut out = String::new();
+    let mut count = 0;
+    while let Some(ch) = digits.pop() {
+        if count == 3 {
+            out.push(',');
+            count = 0;
+        }
+        out.push(ch);
+        count += 1;
+    }
+    out.chars().rev().collect()
 }
 
 fn kernel_elf_dir() -> PathBuf {

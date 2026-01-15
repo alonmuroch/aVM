@@ -69,6 +69,25 @@ fn kernel_tests() {
         }
     }
 
+    let total_tests = reports.len();
+    let passed = reports
+        .iter()
+        .filter(|report| matches!(report.outcome, TestOutcome::Passed))
+        .count();
+    let failed = reports
+        .iter()
+        .filter(|report| matches!(report.outcome, TestOutcome::Failed(_)))
+        .count();
+    let skipped = reports
+        .iter()
+        .filter(|report| matches!(report.outcome, TestOutcome::Skipped(_)))
+        .count();
+    let instruction_count: u64 = reports.iter().map(|report| report.instruction_count).sum();
+
+    println!("\n=== kernel_tests summary ===");
+    println!("Total: {total_tests}  Passed: {passed}  Failed: {failed}  Skipped: {skipped}");
+    println!("Instructions executed: {instruction_count}");
+
     let failures: Vec<_> = reports
         .iter()
         .filter(|report| matches!(report.outcome, TestOutcome::Failed(_)))

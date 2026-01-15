@@ -26,6 +26,8 @@ pub struct TestReport {
     pub exit_code: i32,
     pub stdout: String,
     pub stderr: String,
+    pub instruction_count: u64,
+    pub duration_ms: u128,
 }
 
 pub trait TestEvaluator {
@@ -45,18 +47,28 @@ impl<'a> Suite<'a> {
             let elf = ElfTarget {
                 path: case.elf.clone(),
             };
-            let (outcome, exit_code, stdout, stderr) = match runner.run(&elf, &case.options) {
-                Ok(result) => {
-                    let outcome = self.evaluator.evaluate(case, &result);
-                    (outcome, result.exit_code, result.stdout, result.stderr)
+            let start = std::time::Instant::now();
+            let (outcome, exit_code, stdout, stderr, instruction_count) =
+                match runner.run(&elf, &case.options) {
+                    Ok(result) => {
+                        let outcome = self.evaluator.evaluate(case, &result);
+                        (
+                        outcome,
+                        result.exit_code,
+                        result.stdout,
+                        result.stderr,
+                        result.instruction_count,
+                    )
                 }
                 Err(err) => (
                     TestOutcome::Failed(err.message.clone()),
                     -1,
                     String::new(),
                     err.message,
+                    0,
                 ),
             };
+            let duration_ms = start.elapsed().as_millis();
             reports.push(TestReport {
                 name: case.name.clone(),
                 outcome,
@@ -64,6 +76,8 @@ impl<'a> Suite<'a> {
                 exit_code,
                 stdout,
                 stderr,
+                instruction_count,
+                duration_ms,
             });
         }
         reports

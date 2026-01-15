@@ -1,6 +1,6 @@
 use crate::cpu::PrivilegeMode;
 use crate::memory::{Memory, VirtualAddress};
-use crate::metering::{MeterResult, Metering};
+use crate::metering::{MemoryAccessKind, MeterResult, Metering};
 use core::fmt::Write;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -32,6 +32,7 @@ pub fn console_write(
     ) {
         panic!("Metering halted console write");
     }
+    meter_load(metering, fmt_ptr as usize, fmt_len as usize);
     let borrowed_memory = memory.as_ref();
     let (fmt_start, fmt_end) = va_range(fmt_ptr as usize, fmt_len as usize);
     let fmt_slice = match borrowed_memory.mem_slice(fmt_start, fmt_end) {
@@ -52,6 +53,7 @@ pub fn console_write(
         }
     };
     let (args_start, args_end) = va_range(arg_ptr as usize, arg_len as usize);
+    meter_load(metering, arg_ptr as usize, arg_len as usize);
     let args_bytes_slice = borrowed_memory.mem_slice(args_start, args_end);
     let args_bytes_holder;
     let args_bytes: &[u8] = if let Some(slice) = args_bytes_slice {
@@ -81,6 +83,7 @@ pub fn console_write(
                 let ptr = next() as usize;
                 let len = next() as usize;
                 let (start, end) = va_range(ptr, len);
+                meter_load(metering, ptr, len);
                 match borrowed_memory.mem_slice(start, end) {
                     Some(slice) => {
                         let s_ptr = core::str::from_utf8(slice.as_ref());
@@ -98,6 +101,7 @@ pub fn console_write(
                 let ptr = next() as usize;
                 let len = next() as usize;
                 let (start, end) = va_range(ptr, len);
+                meter_load(metering, ptr, len);
                 match borrowed_memory.mem_slice(start, end) {
                     Some(slice) => {
                         args.push(Arg::Bytes(slice.to_vec()));
@@ -112,6 +116,7 @@ pub fn console_write(
                 let len = next() as usize;
                 let byte_len = len * 4;
                 let (start, end) = va_range(ptr, byte_len);
+                meter_load(metering, ptr, byte_len);
                 match borrowed_memory.mem_slice(start, end) {
                     Some(slice) => {
                         args.push(Arg::Bytes(slice.to_vec()));
@@ -125,6 +130,7 @@ pub fn console_write(
                 let ptr = next() as usize;
                 let len = next() as usize;
                 let (start, end) = va_range(ptr, len);
+                meter_load(metering, ptr, len);
                 match borrowed_memory.mem_slice(start, end) {
                     Some(slice) => {
                         args.push(Arg::Bytes(slice.to_vec()));
@@ -226,4 +232,16 @@ fn va_range(ptr: usize, len: usize) -> (VirtualAddress, VirtualAddress) {
     let start = VirtualAddress(ptr as u32);
     let end = start.wrapping_add(len as u32);
     (start, end)
+}
+
+fn meter_load(metering: &mut dyn Metering, addr: usize, len: usize) {
+    if len == 0 {
+        return;
+    }
+    if matches!(
+        metering.on_memory_access(MemoryAccessKind::Load, addr, len),
+        MeterResult::Halt
+    ) {
+        panic!("Metering halted console memory read");
+    }
 }

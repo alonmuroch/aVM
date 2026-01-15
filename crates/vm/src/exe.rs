@@ -781,6 +781,9 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
+                if !Self::can_continue(self.metering.on_syscall(call_id, &args)) {
+                    return false;
+                }
                 if call_id == CONSOLE_WRITE_ID {
                     let result = console_write(
                         args,

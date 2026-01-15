@@ -8,6 +8,7 @@ pub struct RunResult {
     pub stdout: String,
     pub stderr: String,
     pub output: Vec<u8>,
+    pub instruction_count: u64,
 }
 
 #[derive(Debug)]

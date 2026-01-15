@@ -10,8 +10,10 @@ use types::SV32_DIRECT_MAP_BASE;
 use types::boot::BootInfo;
 use types::kernel_result::KERNEL_RESULT_ADDR;
 use vm::memory::{API, HEAP_PTR_OFFSET, MMU, PAGE_SIZE, Perms, Sv32Memory, VirtualAddress};
+use vm::metering::{MeterResult, Metering};
 use vm::registers::Register;
 use vm::vm::VM;
+use vm::instruction::Instruction;
 
 use crate::arch::{ArchRunner, RunError, RunResult};
 use crate::types::{ElfTarget, RunOptions};
@@ -27,6 +29,18 @@ impl AvmRunner {
 impl Default for AvmRunner {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[derive(Debug)]
+struct InstructionCounter {
+    count: Rc<Cell<u64>>,
+}
+
+impl Metering for InstructionCounter {
+    fn on_instruction(&mut self, _pc: u32, _instr: &Instruction, _size: u8) -> MeterResult {
+        self.count.set(self.count.get().saturating_add(1));
+        MeterResult::Continue
     }
 }
 
@@ -67,6 +81,10 @@ impl ArchRunner for AvmRunner {
         let mut vm = VM::new(memory.clone());
         vm.set_reg_u32(Register::Sp, KERNEL_STACK_TOP);
         vm.cpu.verbose = options.verbose;
+        let instruction_count = Rc::new(Cell::new(0u64));
+        vm.set_metering(Box::new(InstructionCounter {
+            count: Rc::clone(&instruction_count),
+        }));
 
         let writer = Rc::new(RefCell::new(StringWriter::default()));
         vm.cpu.set_verbose_writer(writer.clone());
@@ -105,12 +123,14 @@ impl ArchRunner for AvmRunner {
         let output = read_kernel_blob(memory.as_ref()).unwrap_or_default();
         let exit_code = 0;
         let stderr = String::new();
+        let instruction_count = instruction_count.get();
 
         Ok(RunResult {
             exit_code,
             stdout,
             stderr,
             output,
+            instruction_count,
         })
     }
 }
