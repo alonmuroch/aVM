@@ -4,6 +4,7 @@ pub mod decoder;
 pub mod instruction;
 pub mod isa;
 pub mod isa_compressed;
+pub mod jit;
 pub mod memory;
 pub mod metering;
 pub mod registers;

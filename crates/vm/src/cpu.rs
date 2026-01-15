@@ -1,5 +1,6 @@
 use crate::decoder::{decode_compressed, decode_full};
 use crate::instruction::Instruction;
+use crate::jit::Jit;
 use crate::memory::{Memory, VirtualAddress};
 use crate::metering::{MemoryAccessKind, MeterResult, Metering, NoopMeter};
 use core::cell::RefCell;
@@ -100,6 +101,9 @@ pub struct CPU {
     /// Pluggable metering implementation (gas, resource accounting, etc.)
     pub metering: Box<dyn Metering>,
 
+    /// Optional JIT driver (disabled by default).
+    pub jit: Jit,
+
     /// Minimal CSR storage for CSR instructions
     pub csrs: HashMap<u16, u32>,
 
@@ -146,6 +150,7 @@ impl CPU {
             reservation_addr: None,
             verbose_writer: None,
             metering,
+            jit: Jit::new(false),
             csrs: HashMap::new(),
             priv_mode: PrivilegeMode::Supervisor,
         }
@@ -159,6 +164,16 @@ impl CPU {
     /// Swap in a new metering implementation.
     pub fn set_metering(&mut self, metering: Box<dyn Metering>) {
         self.metering = metering;
+    }
+
+    /// Enable or disable JIT execution.
+    pub fn set_jit_enabled(&mut self, enabled: bool) {
+        self.jit.set_enabled(enabled);
+    }
+
+    /// Configure the JIT hot threshold.
+    pub fn set_jit_hot_threshold(&mut self, threshold: u32) {
+        self.jit.set_hot_threshold(threshold);
     }
 
     /// Helper method to log output
@@ -340,6 +355,12 @@ impl CPU {
     /// moves to the next task automatically, unless a task specifically
     /// redirects the flow (like a branch or jump instruction).
     pub fn step(&mut self, memory: Memory) -> bool {
+        let mut jit = std::mem::take(&mut self.jit);
+        let jit_result = jit.maybe_execute(self, &memory);
+        self.jit = jit;
+        if let Some(result) = jit_result {
+            return result;
+        }
         // EDUCATIONAL: Step 1 - Fetch and decode the next instruction
         let instr = self.next_instruction(Rc::clone(&memory));
 
@@ -499,7 +520,7 @@ impl CPU {
     }
 
     /// Safely read a register with metering.
-    fn read_reg(&mut self, reg: usize) -> Option<u32> {
+    pub(crate) fn read_reg(&mut self, reg: usize) -> Option<u32> {
         if !Self::can_continue(self.metering.on_register_read(reg)) {
             return None;
         }
@@ -508,7 +529,7 @@ impl CPU {
 
     /// Safely write to a register, ignoring writes to x0 (which should always be 0).
     /// Returns false if metering halts execution.
-    fn write_reg(&mut self, rd: usize, value: u32) -> bool {
+    pub(crate) fn write_reg(&mut self, rd: usize, value: u32) -> bool {
         if rd != 0 {
             if !Self::can_continue(self.metering.on_register_write(rd, value, self.priv_mode)) {
                 return false;
@@ -519,7 +540,7 @@ impl CPU {
     }
 
     /// Add to the program counter with wrapping semantics and metering.
-    fn pc_add(&mut self, delta: u32) -> bool {
+    pub(crate) fn pc_add(&mut self, delta: u32) -> bool {
         let old = self.pc;
         let new_pc = self.pc.wrapping_add(delta);
         if !Self::can_continue(self.metering.on_pc_update(old, new_pc)) {
@@ -539,7 +560,7 @@ impl CPU {
     }
 
     /// Set the program counter and meter the update.
-    fn set_pc(&mut self, target: u32) -> bool {
+    pub(crate) fn set_pc(&mut self, target: u32) -> bool {
         let old = self.pc;
         if !Self::can_continue(self.metering.on_pc_update(old, target)) {
             return false;
@@ -547,6 +568,7 @@ impl CPU {
         self.pc = target;
         true
     }
+
 }
 
 impl Default for CPU {

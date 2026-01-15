@@ -9,6 +9,12 @@ edition = "2021"
 [dependencies]
 state = { path = "../state" }  # adjust path as needed
 types = { path = "../types" }  # adjust path as needed
+cranelift-codegen = "0.102"
+cranelift-frontend = "0.102"
+cranelift-jit = "0.102"
+cranelift-module = "0.102"
+cranelift-native = "0.102"
+target-lexicon = "0.12"
 
 [features]
 spec-tests = []
