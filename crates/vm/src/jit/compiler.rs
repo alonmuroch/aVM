@@ -1,21 +1,19 @@
+use crate::cpu::CPU;
 use crate::instruction::Instruction;
 use crate::jit::helpers::register_helper_symbols;
 use crate::jit::trace::{ends_trace, is_branch, Trace, TraceInst};
 use crate::jit::{JitEntry, JitFn};
 use cranelift_codegen::ir::condcodes::IntCC;
-use cranelift_codegen::ir::{types, AbiParam, InstBuilder};
+use cranelift_codegen::ir::{types, AbiParam, InstBuilder, MemFlags};
 use cranelift_codegen::settings::{self, Configurable};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{FuncId, Linkage, Module};
+use std::mem::offset_of;
 
 /// Function IDs for helper calls (register/memory/pc operations).
 #[derive(Debug)]
 struct HelperIds {
-    read_reg: FuncId,
-    write_reg: FuncId,
-    pc_add: FuncId,
-    set_pc: FuncId,
     load_u8_signed: FuncId,
     load_u8_unsigned: FuncId,
     load_u16_signed: FuncId,
@@ -25,6 +23,9 @@ struct HelperIds {
     store_u16: FuncId,
     store_u32: FuncId,
 }
+
+const CPU_PC_OFFSET: i32 = offset_of!(CPU, pc) as i32;
+const CPU_REGS_OFFSET: i32 = offset_of!(CPU, regs) as i32;
 
 /// Cranelift-backed compiler for traces.
 pub struct JitCompiler {
@@ -147,162 +148,162 @@ fn emit_instruction(
 ) -> bool {
     match &inst.instr {
         Instruction::Add { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let val = builder.ins().iadd(lhs, rhs);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Sub { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let val = builder.ins().isub(lhs, rhs);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Addi { rd, rs1, imm } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
             let imm_val = builder.ins().iconst(types::I32, *imm as i64);
             let val = builder.ins().iadd(lhs, imm_val);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::And { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let val = builder.ins().band(lhs, rhs);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Or { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let val = builder.ins().bor(lhs, rhs);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Xor { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let val = builder.ins().bxor(lhs, rhs);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Andi { rd, rs1, imm } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
             let imm_val = builder.ins().iconst(types::I32, *imm as i64);
             let val = builder.ins().band(lhs, imm_val);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Ori { rd, rs1, imm } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
             let imm_val = builder.ins().iconst(types::I32, *imm as i64);
             let val = builder.ins().bor(lhs, imm_val);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Xori { rd, rs1, imm } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
             let imm_val = builder.ins().iconst(types::I32, *imm as i64);
             let val = builder.ins().bxor(lhs, imm_val);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Slt { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let cond = builder.ins().icmp(IntCC::SignedLessThan, lhs, rhs);
             let val = select_bool(builder, cond);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Sltu { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let cond = builder.ins().icmp(IntCC::UnsignedLessThan, lhs, rhs);
             let val = select_bool(builder, cond);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Slti { rd, rs1, imm } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
             let rhs = builder.ins().iconst(types::I32, *imm as i64);
             let cond = builder.ins().icmp(IntCC::SignedLessThan, lhs, rhs);
             let val = select_bool(builder, cond);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Sltiu { rd, rs1, imm } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
             let rhs = builder.ins().iconst(types::I32, *imm as i64);
             let cond = builder.ins().icmp(IntCC::UnsignedLessThan, lhs, rhs);
             let val = select_bool(builder, cond);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Sll { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let mask = builder.ins().iconst(types::I32, 31);
             let shamt = builder.ins().band(rhs, mask);
             let val = builder.ins().ishl(lhs, shamt);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Srl { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let mask = builder.ins().iconst(types::I32, 31);
             let shamt = builder.ins().band(rhs, mask);
             let val = builder.ins().ushr(lhs, shamt);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Sra { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let mask = builder.ins().iconst(types::I32, 31);
             let shamt = builder.ins().band(rhs, mask);
             let val = builder.ins().sshr(lhs, shamt);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Slli { rd, rs1, shamt } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
             let shamt = builder.ins().iconst(types::I32, *shamt as i64);
             let val = builder.ins().ishl(lhs, shamt);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Srli { rd, rs1, shamt } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
             let shamt = builder.ins().iconst(types::I32, *shamt as i64);
             let val = builder.ins().ushr(lhs, shamt);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Srai { rd, rs1, shamt } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
             let shamt = builder.ins().iconst(types::I32, *shamt as i64);
             let val = builder.ins().sshr(lhs, shamt);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Lui { rd, imm } => {
             let val = builder.ins().iconst(types::I32, (*imm << 12) as i64);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Auipc { rd, imm } => {
             let pc_val = builder.ins().iconst(types::I32, inst.pc as i64);
             let imm_val = builder.ins().iconst(types::I32, (*imm << 12) as i64);
             let val = builder.ins().iadd(pc_val, imm_val);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Lw { rd, rs1, offset } | Instruction::Ld { rd, rs1, offset } => {
-            let base = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let base = emit_read_reg(builder, cpu_ptr, *rs1);
             let off = builder.ins().iconst(types::I32, *offset as i64);
             let addr = builder.ins().iadd(base, off);
             let val = emit_load(
@@ -315,11 +316,11 @@ fn emit_instruction(
                 addr,
                 halt_block,
             );
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Lb { rd, rs1, offset } => {
-            let base = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let base = emit_read_reg(builder, cpu_ptr, *rs1);
             let off = builder.ins().iconst(types::I32, *offset as i64);
             let addr = builder.ins().iadd(base, off);
             let val = emit_load(
@@ -332,11 +333,11 @@ fn emit_instruction(
                 addr,
                 halt_block,
             );
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Lbu { rd, rs1, offset } => {
-            let base = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let base = emit_read_reg(builder, cpu_ptr, *rs1);
             let off = builder.ins().iconst(types::I32, *offset as i64);
             let addr = builder.ins().iadd(base, off);
             let val = emit_load(
@@ -349,11 +350,11 @@ fn emit_instruction(
                 addr,
                 halt_block,
             );
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Lh { rd, rs1, offset } => {
-            let base = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let base = emit_read_reg(builder, cpu_ptr, *rs1);
             let off = builder.ins().iconst(types::I32, *offset as i64);
             let addr = builder.ins().iadd(base, off);
             let val = emit_load(
@@ -366,11 +367,11 @@ fn emit_instruction(
                 addr,
                 halt_block,
             );
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Lhu { rd, rs1, offset } => {
-            let base = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let base = emit_read_reg(builder, cpu_ptr, *rs1);
             let off = builder.ins().iconst(types::I32, *offset as i64);
             let addr = builder.ins().iadd(base, off);
             let val = emit_load(
@@ -383,12 +384,12 @@ fn emit_instruction(
                 addr,
                 halt_block,
             );
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Sb { rs1, rs2, offset } => {
-            let base = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let val = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let base = emit_read_reg(builder, cpu_ptr, *rs1);
+            let val = emit_read_reg(builder, cpu_ptr, *rs2);
             let off = builder.ins().iconst(types::I32, *offset as i64);
             let addr = builder.ins().iadd(base, off);
             emit_store(
@@ -402,11 +403,11 @@ fn emit_instruction(
                 val,
                 halt_block,
             );
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Sh { rs1, rs2, offset } => {
-            let base = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let val = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let base = emit_read_reg(builder, cpu_ptr, *rs1);
+            let val = emit_read_reg(builder, cpu_ptr, *rs2);
             let off = builder.ins().iconst(types::I32, *offset as i64);
             let addr = builder.ins().iadd(base, off);
             emit_store(
@@ -420,11 +421,11 @@ fn emit_instruction(
                 val,
                 halt_block,
             );
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Sw { rs1, rs2, offset } => {
-            let base = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let val = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let base = emit_read_reg(builder, cpu_ptr, *rs1);
+            let val = emit_read_reg(builder, cpu_ptr, *rs2);
             let off = builder.ins().iconst(types::I32, *offset as i64);
             let addr = builder.ins().iadd(base, off);
             emit_store(
@@ -438,15 +439,12 @@ fn emit_instruction(
                 val,
                 halt_block,
             );
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Beq { rs1, rs2, offset } => {
             return emit_branch(
-                module,
-                helpers,
                 builder,
                 cpu_ptr,
-                halt_block,
                 inst,
                 *rs1,
                 *rs2,
@@ -456,11 +454,8 @@ fn emit_instruction(
         }
         Instruction::Bne { rs1, rs2, offset } => {
             return emit_branch(
-                module,
-                helpers,
                 builder,
                 cpu_ptr,
-                halt_block,
                 inst,
                 *rs1,
                 *rs2,
@@ -470,11 +465,8 @@ fn emit_instruction(
         }
         Instruction::Blt { rs1, rs2, offset } => {
             return emit_branch(
-                module,
-                helpers,
                 builder,
                 cpu_ptr,
-                halt_block,
                 inst,
                 *rs1,
                 *rs2,
@@ -484,11 +476,8 @@ fn emit_instruction(
         }
         Instruction::Bge { rs1, rs2, offset } => {
             return emit_branch(
-                module,
-                helpers,
                 builder,
                 cpu_ptr,
-                halt_block,
                 inst,
                 *rs1,
                 *rs2,
@@ -498,11 +487,8 @@ fn emit_instruction(
         }
         Instruction::Bltu { rs1, rs2, offset } => {
             return emit_branch(
-                module,
-                helpers,
                 builder,
                 cpu_ptr,
-                halt_block,
                 inst,
                 *rs1,
                 *rs2,
@@ -512,11 +498,8 @@ fn emit_instruction(
         }
         Instruction::Bgeu { rs1, rs2, offset } => {
             return emit_branch(
-                module,
-                helpers,
                 builder,
                 cpu_ptr,
-                halt_block,
                 inst,
                 *rs1,
                 *rs2,
@@ -527,10 +510,10 @@ fn emit_instruction(
         Instruction::Jal { rd, offset, .. } => {
             let return_addr = inst.pc.wrapping_add(inst.size as u32);
             let return_val = builder.ins().iconst(types::I32, return_addr as i64);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, return_val, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, return_val);
             let target = inst.pc.wrapping_add(*offset as u32);
             let target_val = builder.ins().iconst(types::I32, target as i64);
-            emit_set_pc(module, helpers, builder, cpu_ptr, target_val, halt_block);
+            emit_set_pc(builder, cpu_ptr, target_val);
             return true;
         }
         Instruction::Jalr {
@@ -545,86 +528,86 @@ fn emit_instruction(
                 inst.pc.wrapping_add(4)
             };
             let return_val = builder.ins().iconst(types::I32, return_addr as i64);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, return_val, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, return_val);
 
-            let base = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
+            let base = emit_read_reg(builder, cpu_ptr, *rs1);
             let off = builder.ins().iconst(types::I32, *offset as i64);
             let mut target = builder.ins().iadd(base, off);
             let mask = builder.ins().iconst(types::I32, !1i32 as i64);
             target = builder.ins().band(target, mask);
-            emit_set_pc(module, helpers, builder, cpu_ptr, target, halt_block);
+            emit_set_pc(builder, cpu_ptr, target);
             return true;
         }
         Instruction::Mul { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let val = builder.ins().imul(lhs, rhs);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Mulh { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let lhs64 = builder.ins().sextend(types::I64, lhs);
             let rhs64 = builder.ins().sextend(types::I64, rhs);
             let prod = builder.ins().imul(lhs64, rhs64);
             let hi = builder.ins().sshr_imm(prod, 32);
             let val = builder.ins().ireduce(types::I32, hi);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Mulhu { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let lhs64 = builder.ins().uextend(types::I64, lhs);
             let rhs64 = builder.ins().uextend(types::I64, rhs);
             let prod = builder.ins().imul(lhs64, rhs64);
             let hi = builder.ins().ushr_imm(prod, 32);
             let val = builder.ins().ireduce(types::I32, hi);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Mulhsu { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let lhs64 = builder.ins().sextend(types::I64, lhs);
             let rhs64 = builder.ins().uextend(types::I64, rhs);
             let prod = builder.ins().imul(lhs64, rhs64);
             let hi = builder.ins().sshr_imm(prod, 32);
             let val = builder.ins().ireduce(types::I32, hi);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, val, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, val);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Div { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let result = emit_div(builder, lhs, rhs, true);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, result, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, result);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Divu { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let result = emit_div(builder, lhs, rhs, false);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, result, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, result);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Rem { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let result = emit_rem(builder, lhs, rhs, true);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, result, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, result);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Remu { rd, rs1, rs2 } => {
-            let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs1, halt_block);
-            let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, *rs2, halt_block);
+            let lhs = emit_read_reg(builder, cpu_ptr, *rs1);
+            let rhs = emit_read_reg(builder, cpu_ptr, *rs2);
             let result = emit_rem(builder, lhs, rhs, false);
-            emit_write_reg(module, helpers, builder, cpu_ptr, *rd, result, halt_block);
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_write_reg(builder, cpu_ptr, *rd, result);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         Instruction::Fence | Instruction::Unimp => {
-            emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+            emit_pc_add(builder, cpu_ptr, inst.size as u32);
         }
         _ => {
             return false;
@@ -634,67 +617,50 @@ fn emit_instruction(
 }
 
 fn emit_read_reg(
-    module: &mut JITModule,
-    helpers: &HelperIds,
     builder: &mut FunctionBuilder,
     cpu_ptr: cranelift_codegen::ir::Value,
     reg: usize,
-    halt_block: cranelift_codegen::ir::Block,
 ) -> cranelift_codegen::ir::Value {
-    let reg_val = builder.ins().iconst(types::I32, reg as i64);
-    let callee = declare_helper(module, builder, helpers.read_reg);
-    let call = builder.ins().call(callee, &[cpu_ptr, reg_val]);
-    let packed = builder.inst_results(call)[0];
-    let high64 = builder.ins().ushr_imm(packed, 32);
-    let high = builder.ins().ireduce(types::I32, high64);
-    let low = builder.ins().ireduce(types::I32, packed);
-    branch_if_zero(builder, high, halt_block);
-    low
+    let offset = CPU_REGS_OFFSET + (reg as i32 * 4);
+    builder
+        .ins()
+        .load(types::I32, MemFlags::new(), cpu_ptr, offset)
 }
 
 fn emit_write_reg(
-    module: &mut JITModule,
-    helpers: &HelperIds,
     builder: &mut FunctionBuilder,
     cpu_ptr: cranelift_codegen::ir::Value,
     reg: usize,
     value: cranelift_codegen::ir::Value,
-    halt_block: cranelift_codegen::ir::Block,
 ) {
-    let reg_val = builder.ins().iconst(types::I32, reg as i64);
-    let callee = declare_helper(module, builder, helpers.write_reg);
-    let call = builder.ins().call(callee, &[cpu_ptr, reg_val, value]);
-    let ok = builder.inst_results(call)[0];
-    branch_if_zero(builder, ok, halt_block);
+    if reg == 0 {
+        return;
+    }
+    let offset = CPU_REGS_OFFSET + (reg as i32 * 4);
+    builder
+        .ins()
+        .store(MemFlags::new(), value, cpu_ptr, offset);
 }
 
-fn emit_pc_add(
-    module: &mut JITModule,
-    helpers: &HelperIds,
-    builder: &mut FunctionBuilder,
-    cpu_ptr: cranelift_codegen::ir::Value,
-    delta: u32,
-    halt_block: cranelift_codegen::ir::Block,
-) {
+fn emit_pc_add(builder: &mut FunctionBuilder, cpu_ptr: cranelift_codegen::ir::Value, delta: u32) {
+    let pc_val = builder
+        .ins()
+        .load(types::I32, MemFlags::new(), cpu_ptr, CPU_PC_OFFSET);
     let delta_val = builder.ins().iconst(types::I32, delta as i64);
-    let callee = declare_helper(module, builder, helpers.pc_add);
-    let call = builder.ins().call(callee, &[cpu_ptr, delta_val]);
-    let ok = builder.inst_results(call)[0];
-    branch_if_zero(builder, ok, halt_block);
+    let next = builder.ins().iadd(pc_val, delta_val);
+    builder
+        .ins()
+        .store(MemFlags::new(), next, cpu_ptr, CPU_PC_OFFSET);
 }
 
 fn emit_set_pc(
-    module: &mut JITModule,
-    helpers: &HelperIds,
     builder: &mut FunctionBuilder,
     cpu_ptr: cranelift_codegen::ir::Value,
     target: cranelift_codegen::ir::Value,
-    halt_block: cranelift_codegen::ir::Block,
 ) {
-    let callee = declare_helper(module, builder, helpers.set_pc);
-    let call = builder.ins().call(callee, &[cpu_ptr, target]);
-    let ok = builder.inst_results(call)[0];
-    branch_if_zero(builder, ok, halt_block);
+    builder
+        .ins()
+        .store(MemFlags::new(), target, cpu_ptr, CPU_PC_OFFSET);
 }
 
 fn emit_load(
@@ -735,19 +701,16 @@ fn emit_store(
 }
 
 fn emit_branch(
-    module: &mut JITModule,
-    helpers: &HelperIds,
     builder: &mut FunctionBuilder,
     cpu_ptr: cranelift_codegen::ir::Value,
-    halt_block: cranelift_codegen::ir::Block,
     inst: &TraceInst,
     rs1: usize,
     rs2: usize,
     offset: i32,
     cond: IntCC,
 ) -> bool {
-    let lhs = emit_read_reg(module, helpers, builder, cpu_ptr, rs1, halt_block);
-    let rhs = emit_read_reg(module, helpers, builder, cpu_ptr, rs2, halt_block);
+    let lhs = emit_read_reg(builder, cpu_ptr, rs1);
+    let rhs = emit_read_reg(builder, cpu_ptr, rs2);
     let cmp = builder.ins().icmp(cond, lhs, rhs);
     let taken_block = builder.create_block();
     let not_taken_block = builder.create_block();
@@ -760,13 +723,13 @@ fn emit_branch(
     builder.seal_block(taken_block);
     let target = inst.pc.wrapping_add(offset as u32);
     let target_val = builder.ins().iconst(types::I32, target as i64);
-    emit_set_pc(module, helpers, builder, cpu_ptr, target_val, halt_block);
+    emit_set_pc(builder, cpu_ptr, target_val);
     let one = builder.ins().iconst(types::I32, 1);
     builder.ins().return_(&[one]);
 
     builder.switch_to_block(not_taken_block);
     builder.seal_block(not_taken_block);
-    emit_pc_add(module, helpers, builder, cpu_ptr, inst.size as u32, halt_block);
+    emit_pc_add(builder, cpu_ptr, inst.size as u32);
     let one = builder.ins().iconst(types::I32, 1);
     builder.ins().return_(&[one]);
 
@@ -917,22 +880,6 @@ fn branch_if_zero(
 /// Declare helper signatures so the JIT can call into Rust runtime functions.
 fn declare_helpers(module: &mut JITModule) -> HelperIds {
     let ptr_ty = module.target_config().pointer_type();
-    let mut sig_read = module.make_signature();
-    sig_read.params.push(AbiParam::new(ptr_ty));
-    sig_read.params.push(AbiParam::new(types::I32));
-    sig_read.returns.push(AbiParam::new(types::I64));
-
-    let mut sig_write = module.make_signature();
-    sig_write.params.push(AbiParam::new(ptr_ty));
-    sig_write.params.push(AbiParam::new(types::I32));
-    sig_write.params.push(AbiParam::new(types::I32));
-    sig_write.returns.push(AbiParam::new(types::I32));
-
-    let mut sig_pc = module.make_signature();
-    sig_pc.params.push(AbiParam::new(ptr_ty));
-    sig_pc.params.push(AbiParam::new(types::I32));
-    sig_pc.returns.push(AbiParam::new(types::I32));
-
     let mut sig_load = module.make_signature();
     sig_load.params.push(AbiParam::new(ptr_ty));
     sig_load.params.push(AbiParam::new(ptr_ty));
@@ -947,18 +894,6 @@ fn declare_helpers(module: &mut JITModule) -> HelperIds {
     sig_store.returns.push(AbiParam::new(types::I32));
 
     HelperIds {
-        read_reg: module
-            .declare_function("jit_read_reg", Linkage::Import, &sig_read)
-            .unwrap(),
-        write_reg: module
-            .declare_function("jit_write_reg", Linkage::Import, &sig_write)
-            .unwrap(),
-        pc_add: module
-            .declare_function("jit_pc_add", Linkage::Import, &sig_pc)
-            .unwrap(),
-        set_pc: module
-            .declare_function("jit_set_pc", Linkage::Import, &sig_pc)
-            .unwrap(),
         load_u8_signed: module
             .declare_function("jit_load_u8_signed", Linkage::Import, &sig_load)
             .unwrap(),

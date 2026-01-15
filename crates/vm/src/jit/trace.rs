@@ -140,6 +140,14 @@ fn is_supported(instr: &Instruction) -> bool {
             | Instruction::Divu { .. }
             | Instruction::Rem { .. }
             | Instruction::Remu { .. }
+            | Instruction::Beq { .. }
+            | Instruction::Bne { .. }
+            | Instruction::Blt { .. }
+            | Instruction::Bge { .. }
+            | Instruction::Bltu { .. }
+            | Instruction::Bgeu { .. }
+            | Instruction::Jal { .. }
+            | Instruction::Jalr { .. }
             | Instruction::Fence
             | Instruction::Unimp
     )

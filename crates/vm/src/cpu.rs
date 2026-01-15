@@ -73,6 +73,7 @@ pub enum TrapMode {
 /// like pipelining, out-of-order execution, and just-in-time compilation to
 /// achieve much higher performance. However, this simple approach is perfect
 /// for learning and understanding how CPUs work at a fundamental level.
+#[repr(C)]
 pub struct CPU {
     /// Program Counter - points to the next instruction to execute
     /// EDUCATIONAL: In real CPUs, this is a special register that automatically

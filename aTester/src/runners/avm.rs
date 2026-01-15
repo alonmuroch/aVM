@@ -130,6 +130,7 @@ impl ArchRunner for AvmRunner {
         vm.set_reg_u32(Register::Sp, KERNEL_STACK_TOP);
         vm.cpu.verbose = options.verbose;
         vm.cpu.set_jit_enabled(true);
+        vm.cpu.set_jit_hot_threshold(50);
         let instruction_count = Rc::new(Cell::new(0u64));
         let kernel_base_sp = vm.cpu.regs[Register::Sp as usize];
         let kernel_min_sp = Rc::new(Cell::new(kernel_base_sp));

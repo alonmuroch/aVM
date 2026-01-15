@@ -1,15 +1,10 @@
 use crate::cpu::CPU;
-use crate::jit::JitAccess;
 use crate::memory::{Memory, VirtualAddress};
 use crate::metering::MemoryAccessKind;
 use cranelift_jit::JITBuilder;
 
 /// Register all helper symbols with the JIT so generated code can call into Rust.
 pub fn register_helper_symbols(builder: &mut JITBuilder) {
-    builder.symbol("jit_read_reg", jit_read_reg as *const u8);
-    builder.symbol("jit_write_reg", jit_write_reg as *const u8);
-    builder.symbol("jit_pc_add", jit_pc_add as *const u8);
-    builder.symbol("jit_set_pc", jit_set_pc as *const u8);
     builder.symbol("jit_load_u8_signed", jit_load_u8_signed as *const u8);
     builder.symbol("jit_load_u8_unsigned", jit_load_u8_unsigned as *const u8);
     builder.symbol("jit_load_u16_signed", jit_load_u16_signed as *const u8);
@@ -28,45 +23,6 @@ fn pack_ok(value: u32) -> u64 {
 /// Pack a failure indicator (upper 32 bits are 0).
 fn pack_err() -> u64 {
     0
-}
-
-/// Read a register with metering. Returns packed (value, ok) for JIT use.
-pub(crate) unsafe extern "C" fn jit_read_reg(cpu: *mut CPU, reg: u32) -> u64 {
-    let cpu = &mut *cpu;
-    match cpu.jit_read_reg(reg) {
-        Some(val) => pack_ok(val),
-        None => pack_err(),
-    }
-}
-
-/// Write a register with metering. Returns 1 on success.
-pub(crate) unsafe extern "C" fn jit_write_reg(cpu: *mut CPU, reg: u32, value: u32) -> u32 {
-    let cpu = &mut *cpu;
-    if cpu.jit_write_reg(reg, value) {
-        1
-    } else {
-        0
-    }
-}
-
-/// Add to PC with metering. Returns 1 on success.
-pub(crate) unsafe extern "C" fn jit_pc_add(cpu: *mut CPU, delta: u32) -> u32 {
-    let cpu = &mut *cpu;
-    if cpu.jit_pc_add(delta) {
-        1
-    } else {
-        0
-    }
-}
-
-/// Set PC with metering. Returns 1 on success.
-pub(crate) unsafe extern "C" fn jit_set_pc(cpu: *mut CPU, target: u32) -> u32 {
-    let cpu = &mut *cpu;
-    if cpu.jit_set_pc(target) {
-        1
-    } else {
-        0
-    }
 }
 
 /// Load a byte and sign-extend to 32-bit. Returns packed (value, ok).
