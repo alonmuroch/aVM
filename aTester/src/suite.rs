@@ -31,6 +31,7 @@ pub struct TestReport {
     pub stack_used_bytes: u64,
     pub heap_used_bytes: u64,
     pub code_size_bytes: u64,
+    pub jit_stats: Option<vm::jit::JitStats>,
 }
 
 pub trait TestEvaluator {
@@ -60,6 +61,7 @@ impl<'a> Suite<'a> {
                 stack_used_bytes,
                 heap_used_bytes,
                 code_size_bytes,
+                jit_stats,
             ) = match runner.run(&elf, &case.options) {
                 Ok(result) => {
                     let outcome = self.evaluator.evaluate(case, &result);
@@ -72,6 +74,7 @@ impl<'a> Suite<'a> {
                         result.stack_used_bytes,
                         result.heap_used_bytes,
                         result.code_size_bytes,
+                        result.jit_stats,
                     )
                 }
                 Err(err) => (
@@ -83,6 +86,7 @@ impl<'a> Suite<'a> {
                     0,
                     0,
                     0,
+                    None,
                 ),
             };
             let duration_ms = start.elapsed().as_millis();
@@ -98,6 +102,7 @@ impl<'a> Suite<'a> {
                 stack_used_bytes,
                 heap_used_bytes,
                 code_size_bytes,
+                jit_stats,
             });
         }
         reports

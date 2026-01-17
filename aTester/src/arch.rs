@@ -12,6 +12,7 @@ pub struct RunResult {
     pub stack_used_bytes: u64,
     pub heap_used_bytes: u64,
     pub code_size_bytes: u64,
+    pub jit_stats: Option<vm::jit::JitStats>,
 }
 
 #[derive(Debug)]

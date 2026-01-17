@@ -1,7 +1,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use a_tests::{AvmRunner, RunOptions, Suite, TestCase, TestEvaluator, TestKind, TestOutcome};
+use a_tests::{
+    AvmRunner, RunOptions, Suite, TestCase, TestEvaluator, TestKind, TestOutcome,
+    print_jit_stats,
+};
 
 struct ExitCodeEvaluator;
 
@@ -87,6 +90,7 @@ fn kernel_tests() {
     println!("\n=== kernel_tests summary ===");
     println!("Total: {total_tests}  Passed: {passed}  Failed: {failed}  Skipped: {skipped}");
     println!("Instructions executed: {instruction_count}");
+    print_jit_stats(&reports);
 
     let failures: Vec<_> = reports
         .iter()

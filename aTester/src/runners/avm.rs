@@ -190,6 +190,12 @@ impl ArchRunner for AvmRunner {
             _ => kernel_base_sp.saturating_sub(kernel_min_sp.get()) as u64,
         };
         let heap_used_bytes = heap_peak.get();
+        let jit_stats = vm.cpu.jit.stats();
+        let jit_stats = if jit_stats.enabled {
+            Some(jit_stats)
+        } else {
+            None
+        };
 
         Ok(RunResult {
             exit_code,
@@ -200,6 +206,7 @@ impl ArchRunner for AvmRunner {
             stack_used_bytes,
             heap_used_bytes,
             code_size_bytes,
+            jit_stats,
         })
     }
 }

@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use a_tests::{AvmRunner, RunOptions, Suite, TestCase, TestEvaluator, TestKind, TestOutcome};
+use a_tests::{
+    AvmRunner, RunOptions, Suite, TestCase, TestEvaluator, TestKind, TestOutcome,
+    print_jit_stats,
+};
 use types::TransactionReceipt;
 use types::transaction::TransactionType;
 
@@ -110,6 +113,7 @@ fn examples_tests() {
     }
 
     print_summary(&reports, &code_sizes);
+    print_jit_stats(&reports);
 
     let failures: Vec<_> = reports
         .iter()
